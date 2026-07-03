@@ -27,15 +27,17 @@ body[data-page="hashtag"] .feed-column {
 .hashtag-back-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 0 10px 0 8px;
-  border-radius: var(--radius-2);
-  font-size: 0.82rem;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.86rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--color-text-muted);
-  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  background: var(--color-surface-soft);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .hashtag-back-link span[aria-hidden="true"] {
@@ -48,6 +50,7 @@ body[data-page="hashtag"] .feed-column {
   color: var(--color-text);
   background: var(--color-surface-soft);
   transform: translateX(-1px);
+  border-color: rgba(255, 111, 77, 0.18);
 }
 
 /* ── Hero header ───────────────────────────────────────────── */
@@ -56,9 +59,11 @@ body[data-page="hashtag"] .feed-column {
   position: relative;
   top: auto;
   display: block;
-  padding: 16px var(--space-4) 14px;
+  padding: 28px var(--space-4) 22px;
   overflow: hidden;
-  background: transparent;
+  background: linear-gradient(180deg, rgba(255, 111, 77, 0.08), rgba(255, 255, 255, 0.92));
+  border-radius: 28px;
+  box-shadow: var(--shadow-panel);
   border-bottom: 0;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -74,6 +79,15 @@ body[data-page="hashtag"] .feed-column {
     radial-gradient(circle at 16% 14%, color-mix(in srgb, #ff6f4d 16%, transparent), transparent 36%),
     linear-gradient(135deg, color-mix(in srgb, var(--color-surface-soft) 78%, transparent), transparent 70%);
   opacity: 0.9;
+  pointer-events: none;
+}
+
+.hashtag-head::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  background: radial-gradient(circle at 80% 20%, rgba(14, 165, 233, 0.12), transparent 30%);
   pointer-events: none;
 }
 
@@ -99,14 +113,14 @@ body[data-page="hashtag"] .feed-column {
   align-items: center;
   justify-content: center;
   flex: none;
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
   font-family: var(--font-serif);
-  font-size: 1.6rem;
+  font-size: 1.8rem;
   font-weight: 700;
   color: color-mix(in srgb, var(--color-text) 78%, #ff6f4d 22%);
-  background: color-mix(in srgb, #ff6f4d 14%, var(--color-surface) 86%);
+  background: linear-gradient(135deg, rgba(255, 111, 77, 0.18), rgba(255, 255, 255, 0.92));
   border: 1px solid color-mix(in srgb, #ff6f4d 26%, var(--color-border) 74%);
 }
 
@@ -141,7 +155,7 @@ body[data-page="hashtag"] .feed-column {
   flex: none;
   min-height: 38px;
   padding: 0 14px;
-  border: var(--line);
+  border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: var(--radius-pill);
   font-size: 0.8rem;
   font-weight: 800;
@@ -157,8 +171,9 @@ body[data-page="hashtag"] .feed-column {
 }
 
 .hashtag-copy-btn:hover {
-  background: var(--color-hover);
-  border-color: var(--color-border-strong);
+  background: var(--color-surface-soft);
+  border-color: rgba(255, 111, 77, 0.24);
+  transform: translateY(-1px);
 }
 
 .hashtag-copy-btn.is-copied {
@@ -175,15 +190,10 @@ body[data-page="hashtag"] .feed-column {
   gap: 16px;
   align-items: stretch;
   margin: 4px var(--space-4) 18px;
-  padding: 16px;
-  border-radius: var(--radius-2);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, #ff6f4d 8%, transparent), transparent 54%),
-    var(--color-surface-soft);
-}
-
-.hashtag-pulse[hidden] {
-  display: none;
+  padding: 22px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 111, 77, 0.12), rgba(255, 255, 255, 0.95));
+  box-shadow: var(--shadow-soft);
 }
 
 .hashtag-pulse__copy {
@@ -226,9 +236,10 @@ body[data-page="hashtag"] .feed-column {
   display: grid;
   align-content: center;
   min-height: 68px;
-  padding: 10px 12px;
-  border-radius: var(--radius-2);
-  background: color-mix(in srgb, var(--color-surface) 84%, transparent);
+  padding: 16px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 111, 77, 0.12);
 }
 
 .hashtag-pulse__stat strong {
@@ -258,55 +269,41 @@ body[data-page="hashtag"] .feed-column {
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
 }
 
 .hashtag-related__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
-.hashtag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: var(--line);
-  border-radius: var(--radius-pill);
-  font-size: 0.79rem;
-  font-weight: 700;
-  background: var(--color-surface-muted);
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.hashtag-chip:hover {
-  background: var(--color-surface);
-  border-color: var(--color-border-strong);
-}
-
-.hashtag-chip__count {
+.hashtag-related__chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
+  min-height: 38px;
+  padding: 0 14px;
   border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 800;
-  color: var(--color-text-muted);
-  background: color-mix(in srgb, var(--color-surface-soft) 70%, var(--color-surface) 30%);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: var(--color-surface-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
 }
 
-/* ── Sort tabs ─────────────────────────────────────────────── */
+.hashtag-related__chip:hover {
+  background: var(--color-surface);
+  border-color: rgba(255, 111, 77, 0.18);
+  transform: translateY(-1px);
+}
+
+/* ── Tab controls ──────────────────────────────────────────── */
 
 .hashtag-tabs {
   display: flex;
-  gap: 6px;
-  padding: 0 var(--space-4) 14px;
+  gap: 12px;
+  padding: 0 var(--space-4) 18px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -316,136 +313,25 @@ body[data-page="hashtag"] .feed-column {
 }
 
 .hashtag-tab {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  font-size: 0.82rem;
-  font-weight: 700;
+  min-width: 86px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 0.86rem;
+  font-weight: 800;
   color: var(--color-text-muted);
-  background: var(--color-surface-muted);
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
-.hashtag-tab:hover {
+.hashtag-tab:hover,
+.hashtag-tab:focus-visible {
+  background: var(--color-surface-soft);
   color: var(--color-text);
-  background: var(--color-hover);
 }
 
 .hashtag-tab.is-active {
-  color: var(--color-brand-contrast);
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-}
-
-/* ── Feed spacing ──────────────────────────────────────────── */
-
-#hashtag-feed-stream {
-  padding-bottom: var(--space-5);
-}
-
-/* ── Mobile ────────────────────────────────────────────────── */
-
-@media (max-width: 640px) {
-  .hashtag-navline {
-    padding: 12px var(--space-3) 0;
-  }
-
-  .hashtag-back-link {
-    min-height: 34px;
-    padding-left: 4px;
-  }
-
-  .hashtag-head {
-    padding: 14px var(--space-3) 12px;
-  }
-
-  .hashtag-head::before {
-    inset: 6px var(--space-3) auto;
-    height: 132px;
-  }
-
-  .hashtag-head__inner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 14px;
-  }
-
-  .hashtag-head__glyph {
-    width: 44px;
-    height: 44px;
-    font-size: 1.3rem;
-    border-radius: 14px;
-  }
-
-  .hashtag-head__copy .page-title {
-    font-size: 1.7rem;
-  }
-
-  .hashtag-head__copy .section-subtitle {
-    font-size: 0.88rem;
-  }
-
-  .hashtag-copy-btn {
-    align-self: flex-start;
-  }
-
-  .hashtag-pulse {
-    grid-template-columns: 1fr;
-    margin: 2px var(--space-3) 16px;
-    padding: 14px;
-  }
-
-  .hashtag-pulse__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .hashtag-pulse__stat {
-    min-height: 62px;
-  }
-
-  .hashtag-related {
-    padding: 0 var(--space-3) 14px;
-  }
-
-  .hashtag-tabs {
-    padding: 0 var(--space-3) 12px;
-  }
-}
-
-/* ── Dark mode ─────────────────────────────────────────────── */
-
-:root[data-theme="dark"] .hashtag-head::before {
-  background:
-    radial-gradient(circle at 16% 14%, color-mix(in srgb, #ff6f4d 12%, transparent), transparent 36%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-surface-soft) 84%, transparent), transparent 70%);
-}
-
-:root[data-theme="dark"] .hashtag-pulse {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, #ff6f4d 7%, transparent), transparent 56%),
-    var(--color-surface-muted);
-}
-
-:root[data-theme="dark"] .hashtag-pulse__stat {
-  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
-}
-
-:root[data-theme="dark"] .hashtag-chip,
-:root[data-theme="dark"] .hashtag-tab {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border-strong);
-}
-
-:root[data-theme="dark"] .hashtag-chip:hover {
+  color: var(--color-text);
   background: var(--color-surface-soft);
-}
-
-:root[data-theme="dark"] .hashtag-copy-btn {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-brand);
 }
