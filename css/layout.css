@@ -88,12 +88,72 @@
   justify-content: center;
   margin-right: 9px;
   opacity: 0.92;
+  position: relative;
 }
 
 .desktop-nav__icon svg {
   width: 18px;
   height: 18px;
   stroke-width: 2.2;
+}
+
+/* ── Navigation unread marker (typical social media style) ─── */
+
+.nav-unread-dot {
+  position: absolute;
+  border-radius: 999px;
+  background-color: var(--color-text);
+  box-sizing: content-box;
+  pointer-events: none;
+  z-index: 4;
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.18s ease;
+}
+
+.desktop-nav__icon .nav-unread-dot {
+  top: -2px;
+  right: -2px;
+  width: 6.5px;
+  height: 6.5px;
+  border: 1.5px solid var(--color-surface);
+}
+
+.bottom-nav__icon .nav-unread-dot {
+  top: -1px;
+  right: -1px;
+  width: 7.5px;
+  height: 7.5px;
+  border: 2px solid var(--color-surface);
+}
+
+.nav-unread-dot.is-visible {
+  transform: scale(1);
+  opacity: 1;
+}
+
+:root[data-theme="dark"] .desktop-nav__icon .nav-unread-dot {
+  background-color: #ffffff;
+  border-color: var(--color-surface);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .bottom-nav__icon .nav-unread-dot {
+  background-color: #ffffff;
+  border-color: #121316;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="light"] .desktop-nav__icon .nav-unread-dot {
+  background-color: #0a0a0b;
+  border-color: var(--color-surface);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+:root[data-theme="light"] .bottom-nav__icon .nav-unread-dot {
+  background-color: #0a0a0b;
+  border-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .desktop-nav__link:hover {
@@ -148,7 +208,7 @@
 .app-main {
   width: 100%;
   margin: 0 auto;
-  padding: 0 0 calc(74px + env(safe-area-inset-bottom));
+  padding: 0 0 calc(88px + env(safe-area-inset-bottom));
 }
 
 .app-main--narrow,
@@ -873,6 +933,51 @@ body.has-onboarding-open {
 }
 
 /* ── Bottom nav (mobile) ───────────────────────────────────── */
+/* iOS-style floating glass tab bar: translucent frosted pill that
+   floats above the content with real see-through blur.
+
+   This app is a real multi-page app (each nav tap is a genuine browser
+   navigation to a different .html file, not an in-app view swap), so a
+   continuous slide animation across taps isn't possible without a much
+   bigger SPA rewrite. What IS achievable on today's platform without that
+   rewrite: the native Cross-Document View Transitions API. `@view-transition`
+   below opts every same-origin navigation into a browser-native animated
+   handoff, and naming .bottom-nav__inner as a persistent
+   view-transition-name means the browser treats the nav bar itself as one
+   continuous element morphing across the page change, instead of the whole
+   screen (nav included) hard-cutting. Supported in Chrome/Edge 126+ and
+   Safari 18.2+ (so effectively current Chrome Android + iOS Safari); it
+   silently falls back to a normal instant page change everywhere else —
+   no JS, no risk, nothing to break on unsupported browsers. */
+
+@view-transition {
+  navigation: auto;
+}
+
+@supports (view-transition-name: none) {
+  .bottom-nav__inner {
+    view-transition-name: bottom-nav-shell;
+  }
+
+  .bottom-nav__link--create {
+    view-transition-name: bottom-nav-create;
+  }
+
+  /* The default cross-fade the browser applies to a persistently-named
+     element can look like a flash/pop on something that isn't actually
+     changing shape between pages. Since the nav bar's own appearance is
+     identical page to page, skip the fade/scale on its group specifically
+     and let it just sit still while the page content around it
+     transitions — this is what makes it read as "the nav stayed put"
+     rather than "the nav also flickered". */
+  ::view-transition-old(bottom-nav-shell),
+  ::view-transition-new(bottom-nav-shell),
+  ::view-transition-old(bottom-nav-create),
+  ::view-transition-new(bottom-nav-create) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+}
 
 .bottom-nav {
   position: fixed;
@@ -880,28 +985,61 @@ body.has-onboarding-open {
   right: 0;
   bottom: 0;
   z-index: 40;
-  background: var(--color-surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: var(--line);
+  display: flex;
+  justify-content: center;
+  padding: 0 20px calc(20px + env(safe-area-inset-bottom));
+  background: transparent;
+  border-top: 0;
+  pointer-events: none;
   /* Allow the elevated create button to render above the bar */
   overflow: visible;
 }
 
 .bottom-nav__inner {
   width: 100%;
-  max-width: 640px;
+  max-width: 420px;
   margin: 0 auto;
-  padding: 4px 8px calc(6px + env(safe-area-inset-bottom));
+  padding: 6px 8px;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 2px;
+  align-items: center;
+  gap: 3px;
+  border-radius: 28px;
+  pointer-events: auto;
+  position: relative;
+  isolation: isolate;
+  background: color-mix(in srgb, var(--color-surface) 48%, transparent 52%);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 30%, transparent 70%);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.12),
+    0 3px 10px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 color-mix(in srgb, white 45%, transparent 55%);
+}
+
+/* Faint top highlight sheen, the classic glass "catch the light" edge */
+.bottom-nav__inner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 18%;
+  right: 18%;
+  height: 1px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 55%, transparent 45%),
+    transparent
+  );
 }
 
 .bottom-nav__link {
   min-height: 52px;
-  padding: 2px;
-  border-radius: var(--radius-2);
+  padding: 5px 3px 6px;
+  border-radius: 20px;
   border: 0;
   display: inline-flex;
   flex-direction: column;
@@ -909,88 +1047,149 @@ body.has-onboarding-open {
   justify-content: center;
   gap: 3px;
   color: var(--color-text-muted);
-  font-weight: 750;
-  transition: color var(--transition-fast), background var(--transition-fast);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  z-index: 1;
 }
 
 .bottom-nav__icon {
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
 }
 
 .bottom-nav__icon svg {
-  width: 22px;
-  height: 22px;
-  stroke-width: 2.2;
+  width: 21px;
+  height: 21px;
+  stroke-width: 2.1;
 }
 
 .bottom-nav__label {
-  display: none;
+  display: block;
+  font-size: 0.61rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  color: inherit;
+  transition: color 0.18s ease, font-weight 0.18s ease;
 }
 
 .bottom-nav__link:hover {
   color: var(--color-text);
-  background: var(--color-hover);
+}
+
+.bottom-nav__link:active,
+.bottom-nav__link.is-pressed {
+  transform: scale(0.92);
 }
 
 .bottom-nav__link.is-active {
   color: var(--color-text);
-  background: transparent;
 }
 
-/* Active tab indicator dot */
-.bottom-nav__link.is-active::after {
-  content: "";
-  display: block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-text);
+.bottom-nav__link.is-active .bottom-nav__icon {
+  transform: translateY(-1px) scale(1.06);
+}
+
+.bottom-nav__link.is-active .bottom-nav__label {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* Sliding active-tab pill: one shared element repositioned via JS
+   (bindBottomNavAnimations in app.js) rather than a background on each
+   link, so switching tabs animates as a smooth glide instead of an
+   instant color swap between two separate elements. */
+.bottom-nav__active-pill {
   position: absolute;
-  bottom: calc(4px + env(safe-area-inset-bottom));
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 0;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-text) 9%, transparent 91%);
+  transition: transform 0.32s cubic-bezier(0.34, 1.35, 0.64, 1), width 0.32s cubic-bezier(0.34, 1.35, 0.64, 1);
+  pointer-events: none;
+  z-index: 0;
 }
 
-.bottom-nav__link {
-  position: relative;
+/* Active tab indicator dot - removed to avoid overlapping page label */
+.bottom-nav__link.is-active::after {
+  display: none !important;
 }
 
 /* ── Create button in bottom nav ───────────────────────────── */
+/* Frosted glass pop, rounded to match pill geometry */
 
 .bottom-nav__link--create {
-  min-height: 48px;
-  min-width: 48px;
-  border-radius: var(--radius-2);
-  background: var(--color-text);
+  min-height: 52px;
+  min-width: 52px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-text) 82%, transparent 18%);
   color: var(--color-brand-contrast);
-  border: 1px solid var(--color-text);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transform: translateY(-4px);
+  border: 1px solid color-mix(in srgb, var(--color-text) 92%, transparent 8%);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  box-shadow:
+    0 8px 20px color-mix(in srgb, var(--color-text) 32%, transparent 68%),
+    0 2px 6px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 color-mix(in srgb, white 30%, transparent 70%);
+  transform: translateY(-6px);
+  align-self: center;
+  justify-self: center;
+  gap: 2px;
+  padding: 5px 4px 6px;
 }
 
 .bottom-nav__link--create .bottom-nav__icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .bottom-nav__link--create .bottom-nav__icon svg {
-  width: 22px;
-  height: 22px;
-  stroke-width: 2.2;
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.3;
+}
+
+.bottom-nav__link--create .bottom-nav__label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: inherit;
+  letter-spacing: 0.01em;
 }
 
 .bottom-nav__link--create:hover {
-  background: var(--color-brand);
+  background: var(--color-text);
   color: var(--color-brand-contrast);
-  border-color: var(--color-brand);
+  border-color: var(--color-text);
+  transform: translateY(-6px) scale(1.04);
+}
+
+.bottom-nav__link--create:active,
+.bottom-nav__link--create.is-pressed {
+  transform: translateY(-6px) scale(0.92);
 }
 
 .bottom-nav__link--create.is-active {
   color: var(--color-brand-contrast);
   background: var(--color-text);
+}
+
+.bottom-nav__link--create.is-active .bottom-nav__icon {
+  transform: none;
 }
 
 .bottom-nav__link--create::after {
@@ -1003,15 +1202,28 @@ body.has-onboarding-open {
   background: color-mix(in srgb, var(--color-surface) 96%, white 4%);
 }
 
-:root[data-theme="dark"] .bottom-nav {
-  background: color-mix(in srgb, var(--color-surface) 95%, white 5%);
-  border-top-color: var(--color-border);
+:root[data-theme="dark"] .bottom-nav__inner {
+  background: color-mix(in srgb, var(--color-surface) 40%, transparent 60%);
+  border-color: color-mix(in srgb, white 14%, transparent 86%);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.55),
+    0 4px 14px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 color-mix(in srgb, white 12%, transparent 88%);
+}
+
+:root[data-theme="dark"] .bottom-nav__inner::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, white 24%, transparent 76%),
+    transparent
+  );
 }
 
 :root[data-theme="dark"] .bottom-nav__link--create,
 :root[data-theme="dark"] .bottom-nav__link--create:hover,
 :root[data-theme="dark"] .bottom-nav__link--create.is-active {
-  background: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 84%, transparent 16%);
   color: var(--color-brand-contrast);
   border-color: var(--color-text);
 }

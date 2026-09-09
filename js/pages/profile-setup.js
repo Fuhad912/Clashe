@@ -197,7 +197,7 @@
   function setAvatarHandle(handleEl, username) {
     if (!handleEl) return;
     const normalized = window.ClashlyProfiles.normalizeUsername(username || "");
-    handleEl.textContent = `@${normalized || "clashly"}`;
+    handleEl.textContent = `@${normalized || "clashe"}`;
   }
 
   function redirectToHome() {
@@ -633,6 +633,14 @@
               throw new Error("Username already exists. Choose another one.");
             }
             throw saveResult.error;
+          }
+
+          if (window.ClashlyEmail && typeof window.ClashlyEmail.sendWelcomeEmail === "function") {
+            window.ClashlyEmail.sendWelcomeEmail({
+              email: user.email,
+              username: normalizedUsername,
+              userId: user.id,
+            }).catch(() => {});
           }
 
           setStatus("Profile saved. Redirecting to Clashe...", "success");

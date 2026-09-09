@@ -44,6 +44,53 @@
     return Math.max(1, Math.min(max || fallback, Math.floor(numeric)));
   }
 
+  // Relevance tiers, highest first: exact match, then prefix match, then a
+  // plain substring hit anywhere else in the field. Used to rank search
+  // candidates before any activity/engagement weighting is applied.
+  function matchRelevance(fieldValue, safeQuery) {
+    const normalizedField = String(fieldValue || "").toLowerCase();
+    const normalizedQuery = String(safeQuery || "").toLowerCase();
+    if (!normalizedQuery) return 0;
+    if (normalizedField === normalizedQuery) return 3;
+    if (normalizedField.startsWith(normalizedQuery)) return 2;
+    if (normalizedField.includes(normalizedQuery)) return 1;
+    return 0;
+  }
+
+  async function fetchFollowerCounts(userIds) {
+    if (!userIds.length) return { countsById: new Map(), error: null };
+    const client = getClientOrThrow();
+    const result = await client
+      .from("follows")
+      .select("following_id")
+      .in("following_id", userIds);
+
+    if (result.error) return { countsById: new Map(), error: result.error };
+
+    const countsById = new Map();
+    (result.data || []).forEach((row) => {
+      countsById.set(row.following_id, (countsById.get(row.following_id) || 0) + 1);
+    });
+    return { countsById, error: null };
+  }
+
+  async function fetchHashtagTakeCounts(hashtagIds) {
+    if (!hashtagIds.length) return { countsById: new Map(), error: null };
+    const client = getClientOrThrow();
+    const result = await client
+      .from(TAKE_HASHTAGS_TABLE)
+      .select("hashtag_id")
+      .in("hashtag_id", hashtagIds);
+
+    if (result.error) return { countsById: new Map(), error: result.error };
+
+    const countsById = new Map();
+    (result.data || []).forEach((row) => {
+      countsById.set(row.hashtag_id, (countsById.get(row.hashtag_id) || 0) + 1);
+    });
+    return { countsById, error: null };
+  }
+
   function getCached(cacheMap, key, ttlMs) {
     const entry = cacheMap.get(key);
     if (!entry) return null;
@@ -93,6 +140,9 @@
     const client = getClientOrThrow();
     const safeQuery = normalizeQuery(query).toLowerCase();
     const limit = clampLimit(options && options.limit, 8, 20);
+    // Pull a wider candidate pool than we'll actually show, since the DB-side
+    // sort is just alphabetical — real ranking happens client-side below.
+    const candidatePoolSize = Math.min(60, limit * 5);
 
     if (!safeQuery) {
       return { users: [], error: null };
@@ -102,12 +152,37 @@
       .from(PROFILES_TABLE)
       .select("id, username, bio, avatar_url")
       .ilike("username", `%${safeQuery}%`)
-      .order("username", { ascending: true })
-      .limit(limit);
+      .limit(candidatePoolSize);
+
+    if (result.error) {
+      return { users: [], error: result.error };
+    }
+
+    const candidates = result.data || [];
+    const candidateIds = candidates.map((user) => user.id).filter(Boolean);
+    const followerCounts = await fetchFollowerCounts(candidateIds);
+    // A follower-count lookup failure shouldn't sink the whole search — we
+    // still have valid relevance-ranked results, just without the activity
+    // tiebreak, so this stays a silent degradation rather than a hard error.
+    const countsById = followerCounts.countsById;
+
+    const ranked = candidates
+      .map((user) => ({
+        user,
+        relevance: matchRelevance(user.username, safeQuery),
+        followers: countsById.get(user.id) || 0,
+      }))
+      .sort((left, right) => {
+        if (right.relevance !== left.relevance) return right.relevance - left.relevance;
+        if (right.followers !== left.followers) return right.followers - left.followers;
+        return String(left.user.username || "").localeCompare(String(right.user.username || ""));
+      })
+      .slice(0, limit)
+      .map((entry) => entry.user);
 
     return {
-      users: result.data || [],
-      error: result.error,
+      users: ranked,
+      error: null,
     };
   }
 
@@ -115,6 +190,7 @@
     const client = getClientOrThrow();
     const safeQuery = normalizeHashtagQuery(query);
     const limit = clampLimit(options && options.limit, 8, 20);
+    const candidatePoolSize = Math.min(60, limit * 5);
 
     if (!safeQuery) {
       return { hashtags: [], error: null };
@@ -124,12 +200,34 @@
       .from(HASHTAGS_TABLE)
       .select("id, tag")
       .ilike("tag", `%${safeQuery}%`)
-      .order("tag", { ascending: true })
-      .limit(limit);
+      .limit(candidatePoolSize);
+
+    if (result.error) {
+      return { hashtags: [], error: result.error };
+    }
+
+    const candidates = result.data || [];
+    const candidateIds = candidates.map((hashtag) => hashtag.id).filter(Boolean);
+    const takeCounts = await fetchHashtagTakeCounts(candidateIds);
+    const countsById = takeCounts.countsById;
+
+    const ranked = candidates
+      .map((hashtag) => ({
+        hashtag,
+        relevance: matchRelevance(hashtag.tag, safeQuery),
+        takeCount: countsById.get(hashtag.id) || 0,
+      }))
+      .sort((left, right) => {
+        if (right.relevance !== left.relevance) return right.relevance - left.relevance;
+        if (right.takeCount !== left.takeCount) return right.takeCount - left.takeCount;
+        return String(left.hashtag.tag || "").localeCompare(String(right.hashtag.tag || ""));
+      })
+      .slice(0, limit)
+      .map((entry) => entry.hashtag);
 
     return {
-      hashtags: result.data || [],
-      error: result.error,
+      hashtags: ranked,
+      error: null,
     };
   }
 
@@ -306,10 +404,12 @@
       p_recent_take_limit: recentTakeLimit,
     });
 
-    if (!rpcResult.error) {
+    if (!rpcResult.error && Array.isArray(rpcResult.data) && rpcResult.data.length > 0) {
       const payload = {
-        topics: (rpcResult.data || []).map((row) => ({
-          tag: row.tag,
+        topics: rpcResult.data.map((row) => ({
+          tag: row.tag || row.keyword,
+          keyword: row.keyword || row.tag,
+          category: row.category || "Debate",
           takeCount: Number(row.take_count || 0),
           engagementCount: Number(row.engagement_count || 0),
           latestAt: row.latest_at || "",
@@ -322,21 +422,21 @@
       return payload;
     }
 
-    if (!isMissingRpcFunction(rpcResult.error, "get_trending_topics")) {
-      return {
-        topics: [],
-        error: rpcResult.error,
-        meta,
-      };
-    }
-
     const cutoffIso = new Date(Date.now() - windowHours * 36e5).toISOString();
-    const recentTakesResult = await client
+    let recentTakesResult = await client
       .from(TAKES_TABLE)
       .select("id, created_at")
       .gte("created_at", cutoffIso)
       .order("created_at", { ascending: false })
       .limit(recentTakeLimit);
+
+    if (recentTakesResult.error || !recentTakesResult.data || !recentTakesResult.data.length) {
+      recentTakesResult = await client
+        .from(TAKES_TABLE)
+        .select("id, created_at")
+        .order("created_at", { ascending: false })
+        .limit(recentTakeLimit);
+    }
 
     if (recentTakesResult.error) {
       return { topics: [], error: recentTakesResult.error, meta };
@@ -420,6 +520,8 @@
       .map((topic) => ({
         id: topic.id,
         tag: topic.tag,
+        keyword: topic.tag,
+        category: "Trending",
         takeCount: topic.takeCount,
         engagementCount: topic.engagementCount,
         latestAt: topic.latestAt,

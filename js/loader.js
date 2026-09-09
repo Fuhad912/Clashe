@@ -5,7 +5,18 @@
   }
 
   root.dataset.clasheLoaderBound = "true";
-  root.classList.add("clashe-loading");
+
+  const isColdBoot = (function () {
+    try {
+      return !window.sessionStorage.getItem("clashe_app_booted");
+    } catch (_e) {
+      return true;
+    }
+  })();
+
+  if (isColdBoot) {
+    root.classList.add("clashe-loading");
+  }
 
   const page = document.body ? document.body.dataset.page || "" : "";
   const requiresAuth = document.body ? document.body.dataset.requiresAuth === "true" : false;
@@ -16,14 +27,16 @@
   const EXIT_DURATION_MS = 150;
   const start = Date.now();
   const pendingTokens = new Set();
-  let hidden = false;
+  let hidden = !isColdBoot;
 
-  if (page === "auth" || requiresAuth) {
-    pendingTokens.add("route-guard");
-  }
+  if (isColdBoot) {
+    if (page === "auth" || requiresAuth) {
+      pendingTokens.add("route-guard");
+    }
 
-  if (dataReadyPages.has(page)) {
-    pendingTokens.add("page-data");
+    if (dataReadyPages.has(page)) {
+      pendingTokens.add("page-data");
+    }
   }
 
   function ensureLoader() {
@@ -45,22 +58,45 @@
     );
   }
 
+  let exitTimer = null;
+
   function clearLoader() {
+    try {
+      window.sessionStorage.setItem("clashe_app_booted", "1");
+    } catch (_e) {}
     root.classList.remove("clashe-loading");
     root.classList.add("clashe-loader-exit");
-    window.setTimeout(() => {
+    if (exitTimer) window.clearTimeout(exitTimer);
+    exitTimer = window.setTimeout(() => {
       root.classList.remove("clashe-loader-exit");
       const loader = document.getElementById("clashe-loader");
       if (loader) loader.remove();
+      exitTimer = null;
     }, EXIT_DURATION_MS);
   }
 
-  function hideLoader() {
+  function hideLoader(token) {
+    if (token) {
+      pendingTokens.delete(String(token));
+      if (pendingTokens.size > 0) return;
+    }
     if (hidden) return;
     hidden = true;
-    const elapsed = Date.now() - start;
-    const wait = Math.max(0, MIN_DURATION_MS - elapsed);
-    window.setTimeout(clearLoader, wait);
+    clearLoader();
+  }
+
+  function showLoader(token) {
+    if (exitTimer) {
+      window.clearTimeout(exitTimer);
+      exitTimer = null;
+    }
+    hidden = false;
+    if (token) {
+      pendingTokens.add(String(token));
+    }
+    ensureLoader();
+    root.classList.remove("clashe-loader-exit");
+    root.classList.add("clashe-loading");
   }
 
   function maybeHideLoader() {
@@ -68,7 +104,13 @@
       return;
     }
 
-    hideLoader();
+    const elapsed = Date.now() - start;
+    const wait = Math.max(0, MIN_DURATION_MS - elapsed);
+    if (wait > 0) {
+      window.setTimeout(hideLoader, wait);
+    } else {
+      hideLoader();
+    }
   }
 
   function hold(token) {
@@ -85,6 +127,8 @@
   window.ClasheLoader = {
     hold,
     release,
+    show: showLoader,
+    hide: hideLoader,
     markReady(token) {
       release(token || "page-data");
     },
@@ -93,22 +137,24 @@
   document.addEventListener(
     "DOMContentLoaded",
     () => {
-      ensureLoader();
-      if (!pendingTokens.size) {
-        window.setTimeout(maybeHideLoader, DOM_READY_FALLBACK_MS);
+      if (isColdBoot) {
+        ensureLoader();
+        if (!pendingTokens.size) {
+          window.setTimeout(maybeHideLoader, DOM_READY_FALLBACK_MS);
+        }
       }
     },
     { once: true }
   );
 
-  if (document.body) {
+  if (isColdBoot && document.body) {
     ensureLoader();
   }
 
   window.addEventListener(
     "load",
     () => {
-      if (!pendingTokens.size) {
+      if (isColdBoot && !pendingTokens.size) {
         maybeHideLoader();
       }
     },
@@ -312,20 +358,51 @@
 
   /* ── Trending topics skeleton ────────────────────────────── */
   window.clasheShowTrendingSkeleton = function (containerId, count) {
-    count = count || 3;
+    count = count || 4;
     var container = document.getElementById(containerId);
     if (!container) return;
     var html = "";
     for (var i = 0; i < count; i++) {
-      html += '<div class="skeleton-topic-card" aria-hidden="true">'
-        + '<div class="skeleton-topic-card__body">'
-          + '<div class="skeleton-line skeleton-line--sm skeleton-shimmer" style="width:25%"></div>'
-          + '<div class="skeleton-line skeleton-line--lg skeleton-shimmer" style="width:55%"></div>'
-          + '<div class="skeleton-line skeleton-line--sm skeleton-shimmer" style="width:70%"></div>'
-        + '</div>'
-        + '<div class="skeleton-topic-card__stats">'
-          + '<div class="skeleton-topic-stat skeleton-shimmer"></div>'
-          + '<div class="skeleton-topic-stat skeleton-shimmer"></div>'
+      html += '<div class="skeleton-trend-item" aria-hidden="true">'
+        + '<div class="skeleton-line skeleton-line--sm skeleton-shimmer" style="width:28%;margin-bottom:6px"></div>'
+        + '<div class="skeleton-line skeleton-line--lg skeleton-shimmer" style="width:48%;margin-bottom:6px"></div>'
+        + '<div class="skeleton-line skeleton-line--sm skeleton-shimmer" style="width:20%"></div>'
+        + '</div>';
+    }
+    container.innerHTML = html;
+    container.hidden = false;
+  };
+
+  /* ── Comment skeleton ─────────────────────────────────────── */
+  window.clasheShowCommentsSkeleton = function (containerIdOrEl, count) {
+    count = count || 4;
+    var container = typeof containerIdOrEl === "string" ? document.getElementById(containerIdOrEl) : containerIdOrEl;
+    if (!container) return;
+    var html = "";
+    var configs = [
+      { w1: "90%", w2: "65%", isReply: false },
+      { w1: "78%", w2: "", isReply: true },
+      { w1: "95%", w2: "80%", isReply: false },
+      { w1: "70%", w2: "", isReply: false },
+    ];
+    for (var i = 0; i < count; i++) {
+      var cfg = configs[i % configs.length];
+      var replyClass = cfg.isReply ? " skeleton-comment--reply" : "";
+      html += '<div class="skeleton-comment' + replyClass + '" aria-hidden="true">'
+        + '<div class="skeleton-comment__avatar skeleton-shimmer"></div>'
+        + '<div class="skeleton-comment__body">'
+          + '<div class="skeleton-comment__meta">'
+            + '<div class="skeleton-comment__user skeleton-shimmer"></div>'
+            + '<div class="skeleton-comment__dot"></div>'
+            + '<div class="skeleton-comment__time skeleton-shimmer"></div>'
+          + '</div>'
+          + '<div class="skeleton-comment__line skeleton-shimmer" style="width:100%"></div>'
+          + (cfg.w1 ? '<div class="skeleton-comment__line skeleton-shimmer" style="width:' + cfg.w1 + '"></div>' : '')
+          + (cfg.w2 ? '<div class="skeleton-comment__line skeleton-shimmer" style="width:' + cfg.w2 + '"></div>' : '')
+          + '<div class="skeleton-comment__actions">'
+            + '<div class="skeleton-comment__action skeleton-shimmer"></div>'
+            + '<div class="skeleton-comment__action skeleton-shimmer"></div>'
+          + '</div>'
         + '</div>'
         + '</div>';
     }

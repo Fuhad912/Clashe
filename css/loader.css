@@ -26,6 +26,7 @@
 .clashe-loader-exit .clashe-loader {
   visibility: visible;
   opacity: 1;
+  pointer-events: auto;
 }
 
 .clashe-loader-exit .clashe-loader {
@@ -374,32 +375,90 @@
   border-radius: var(--radius-pill);
 }
 
-/* ── Trending topic card skeleton ───────────────────────────── */
+/* ── Trending list skeleton ─────────────────────────────────── */
 
-.skeleton-topic-card {
-  display: grid;
-  gap: 14px;
-  padding: 16px 18px;
-  border: var(--line);
-  border-radius: var(--radius-2);
+.skeleton-trend-item {
+  display: block;
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
 }
 
-.skeleton-topic-card__body {
+/* ── Comment item skeleton ─────────────────────────────────── */
+
+.skeleton-comment {
   display: grid;
-  gap: 10px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: var(--line);
 }
 
-.skeleton-topic-card__stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding-top: 12px;
-  border-top: var(--line);
+.skeleton-comment__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.skeleton-topic-stat {
-  height: 44px;
+.skeleton-comment__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.skeleton-comment__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skeleton-comment__user {
+  height: 12px;
+  width: 100px;
   border-radius: var(--radius-1);
+}
+
+.skeleton-comment__dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border-strong, var(--color-border));
+}
+
+.skeleton-comment__time {
+  height: 10px;
+  width: 45px;
+  border-radius: var(--radius-1);
+}
+
+.skeleton-comment__line {
+  height: 13px;
+  border-radius: var(--radius-1);
+}
+
+.skeleton-comment__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.skeleton-comment__action {
+  height: 14px;
+  width: 42px;
+  border-radius: var(--radius-1);
+}
+
+.skeleton-comment--reply {
+  padding-left: 28px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.skeleton-comment--reply .skeleton-comment__avatar {
+  width: 32px;
+  height: 32px;
 }
 
 /* ── Profile head skeleton helpers ──────────────────────────── */
@@ -461,8 +520,8 @@
     padding: 14px var(--space-3) 16px;
   }
 
-  .skeleton-topic-card {
-    padding: 14px var(--space-3);
+  .skeleton-trend-item {
+    padding: 12px var(--space-3);
   }
 }
 

@@ -78,16 +78,20 @@
 
     currentNotifications = currentNotifications.map((item) => ({ ...item, is_read: true }));
     renderList();
+    if (window.ClasheNav && typeof window.ClasheNav.updateUnreadNotificationMarker === "function") {
+      window.ClasheNav.updateUnreadNotificationMarker(false);
+    }
+    window.dispatchEvent(new CustomEvent("clashly:notifications-read"));
   }
 
-  async function loadNotifications() {
+  async function loadNotifications(options = {}) {
     if (!currentUserId || !window.ClashlyNotifications) return;
 
     // Hide the "Loading..." text — the skeleton communicates loading state visually
     setState("", "");
 
-    // Show skeleton immediately so the page never looks blank
-    if (typeof window.clasheShowNotificationSkeleton === "function") {
+    // Show skeleton only if not skipping
+    if (!options.skipSkeleton && typeof window.clasheShowNotificationSkeleton === "function") {
       window.clasheShowNotificationSkeleton("notifications-list", 6);
     }
 
@@ -99,6 +103,11 @@
 
       currentNotifications = result.notifications || [];
       renderList();
+      if (window.ClasheCache) {
+        window.ClasheCache.savePageState("notifications_" + (currentUserId || "guest"), {
+          notifications: currentNotifications,
+        });
+      }
       window.setTimeout(() => {
         markUnreadAsRead().catch(() => {});
       }, 160);
@@ -134,7 +143,37 @@
       const sessionState = await window.ClashlySession.resolveSession();
       currentUserId = sessionState.user ? sessionState.user.id : "";
       bindList();
-      await loadNotifications();
+
+      const cacheKey = "notifications_" + (currentUserId || "guest");
+
+      window.addEventListener("pagehide", () => {
+        if (window.ClasheCache && currentNotifications.length) {
+          window.ClasheCache.savePageState(cacheKey, { notifications: currentNotifications });
+          window.ClasheCache.saveScroll(cacheKey);
+        }
+      });
+      window.addEventListener("beforeunload", () => {
+        if (window.ClasheCache && currentNotifications.length) {
+          window.ClasheCache.savePageState(cacheKey, { notifications: currentNotifications });
+          window.ClasheCache.saveScroll(cacheKey);
+        }
+      });
+
+      const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey) : null;
+      const cachedData = cachedRecord && cachedRecord.data;
+      const hasCachedNotifs = Boolean(
+        cachedData && Array.isArray(cachedData.notifications) && cachedData.notifications.length > 0
+      );
+
+      if (hasCachedNotifs) {
+        currentNotifications = cachedData.notifications;
+        renderList();
+        if (typeof cachedRecord.scroll === "number" && cachedRecord.scroll > 0) {
+          window.ClasheCache.restoreScroll(cacheKey);
+        }
+      }
+
+      await loadNotifications({ skipSkeleton: hasCachedNotifs });
     } finally {
       if (window.ClasheLoader) {
         window.ClasheLoader.release("page-data");
@@ -142,5 +181,26 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", initNotificationsPage);
+  function tryFastSyncHydrateNotifications() {
+    const listEl = document.getElementById("notifications-list");
+    if (!listEl || !window.ClasheCache) return;
+    const cacheKey = "notifications_" + (currentUserId || "guest");
+    const cachedRecord = window.ClasheCache.getPageState(cacheKey);
+    const cachedData = cachedRecord && cachedRecord.data;
+    if (cachedData && Array.isArray(cachedData.notifications) && cachedData.notifications.length > 0) {
+      currentNotifications = cachedData.notifications;
+      renderList();
+      if (typeof cachedRecord.scroll === "number" && cachedRecord.scroll > 0) {
+        window.ClasheCache.restoreScroll(cacheKey);
+      }
+    }
+  }
+
+  tryFastSyncHydrateNotifications();
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initNotificationsPage);
+  } else {
+    initNotificationsPage();
+  }
 })();

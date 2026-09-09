@@ -231,7 +231,10 @@
       event.preventDefault();
       try {
         await window.ClashlyUtils.copyText(_currentUrl);
-        setStatus("Profile link copied.", "success");
+        if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+          window.ClashlyUtils.showToast("Profile link copied", "success");
+        }
+        setStatus("", "");
       } catch (err) {
         setStatus("Could not copy link.", "error");
       }

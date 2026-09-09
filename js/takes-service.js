@@ -590,6 +590,19 @@
     return createVoteSummary(0, 0, "");
   }
 
+  // Relevance tiers, highest first: exact match, then prefix match, then a
+  // plain substring hit anywhere else in the text. Mirrors the scoring used
+  // for user/hashtag search in search-service.js.
+  function matchTextRelevance(fieldValue, safeQuery) {
+    const normalizedField = String(fieldValue || "").toLowerCase();
+    const normalizedQuery = String(safeQuery || "").toLowerCase();
+    if (!normalizedQuery) return 0;
+    if (normalizedField === normalizedQuery) return 3;
+    if (normalizedField.startsWith(normalizedQuery)) return 2;
+    if (normalizedField.includes(normalizedQuery)) return 1;
+    return 0;
+  }
+
   function previewVoteSummary(vote, nextVoteType) {
     const currentVote = vote || defaultVoteSummary();
     const safeNextVoteType = normalizeVoteType(nextVoteType);
@@ -1631,13 +1644,18 @@
       };
     }
 
+    // Pull a wider candidate window than we'll show — the plain ilike match
+    // has no relevance ordering on its own, so we widen the net, decorate
+    // with vote data, then score client-side below.
+    const candidatePoolSize = Math.min(MAX_PAGE_SIZE, limit * 4);
+
     let takeQueryBuilder = client
       .from(TAKES_TABLE)
       .select("id, user_id, content, image_url, created_at")
       .ilike("content", `%${safeQuery}%`)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
-      .limit(limit);
+      .limit(candidatePoolSize);
 
     if (cursor) {
       takeQueryBuilder = takeQueryBuilder.lt("created_at", cursor.created_at);
@@ -1653,11 +1671,30 @@
       return { takes: [], nextCursor: null, hasMore: false, error: decorated.error };
     }
 
-    const nextCursor = buildNextCursor(takeQuery.data || [], limit);
+    const ranked = (decorated.takes || [])
+      .map((take) => {
+        const vote = take.vote || defaultVoteSummary();
+        const relevance = matchTextRelevance(take.content, safeQuery);
+        const engagement = Number(vote.total_votes || 0);
+        // Relevance dominates the ordering; engagement only breaks ties
+        // within the same relevance tier so a wildly popular but weakly
+        // matching take can't outrank a strong match.
+        return { take, score: relevance * 1000 + Math.min(engagement, 999) };
+      })
+      .sort((left, right) => {
+        if (right.score !== left.score) return right.score - left.score;
+        return new Date(right.take.created_at) - new Date(left.take.created_at);
+      })
+      .slice(0, limit)
+      .map((entry) => entry.take);
+
+    // Relevance re-sorting breaks the recency-based cursor contract, so this
+    // fallback path only supports a single scored page rather than deep
+    // pagination. The RPC path above (when available) still paginates fully.
     return {
-      takes: decorated.takes || [],
-      nextCursor,
-      hasMore: Boolean(nextCursor),
+      takes: ranked,
+      nextCursor: null,
+      hasMore: false,
       error: null,
     };
   }

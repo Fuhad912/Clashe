@@ -701,6 +701,20 @@
       invalidateNotificationCacheForUser(userId);
     }
 
+    // Always dispatch email notification via Clashe email service
+    if (window.ClashlyEmail && typeof window.ClashlyEmail.sendNotificationEmail === "function") {
+      window.ClashlyEmail.sendNotificationEmail({
+        recipientId: userId,
+        actorId,
+        type: safeType,
+        targetTakeId: targetTakeId || undefined,
+        targetCommentId: targetCommentId || undefined,
+        metadata: input.metadata || {},
+      }).catch((err) => {
+        console.warn("[ClasheNotifications] Email dispatch notice:", err);
+      });
+    }
+
     return {
       notification: result.data || null,
       error: result.error,
@@ -929,10 +943,50 @@
     };
   }
 
+  async function fetchUnreadCount(userId) {
+    const safeUserId = String(userId || "").trim();
+    if (!safeUserId) return { count: 0, error: null };
+
+    // 1. Check in-memory cache
+    for (const [cacheKey, cacheEntry] of notificationsCache.entries()) {
+      if (cacheKey.startsWith(`${safeUserId}|`) && Date.now() - cacheEntry.at <= CACHE_TTL_MS) {
+        const cached = cacheEntry.value;
+        if (cached && Array.isArray(cached.notifications)) {
+          const unreadCount = cached.notifications.filter((item) => !item.is_read).length;
+          return { count: unreadCount, error: null };
+        }
+      }
+    }
+
+    // 2. Direct count query from Supabase
+    try {
+      const client = getClientOrThrow();
+      const { count, error } = await client
+        .from(NOTIFICATIONS_TABLE)
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", safeUserId)
+        .eq("is_read", false);
+
+      if (!error && typeof count === "number") {
+        return { count, error: null };
+      }
+    } catch (_) {}
+
+    // 3. Fallback to fetchNotifications (checks derived/local notifications)
+    try {
+      const listResult = await fetchNotifications(safeUserId, { limit: 25 });
+      const count = (listResult.notifications || []).filter((item) => !item.is_read).length;
+      return { count, error: listResult.error || null };
+    } catch (err) {
+      return { count: 0, error: err };
+    }
+  }
+
   window.ClashlyNotifications = {
     NOTIFICATIONS_TABLE,
     createNotification,
     fetchNotifications,
     markNotificationsRead,
+    fetchUnreadCount,
   };
 })();

@@ -29,15 +29,31 @@
     maximumFractionDigits: 0,
   });
 
+  let metaStatusTimer = null;
+
+
   function setMetaStatus(message, type) {
     const metaNote = document.getElementById("profile-meta-note");
     if (!metaNote) return;
+
+    // Cancel any pending auto-dismiss
+    if (metaStatusTimer) { clearTimeout(metaStatusTimer); metaStatusTimer = null; }
 
     metaNote.hidden = !message;
     metaNote.textContent = message || "";
     metaNote.classList.remove("is-error", "is-success");
     if (type === "error") metaNote.classList.add("is-error");
     if (type === "success") metaNote.classList.add("is-success");
+
+    // Auto-dismiss success messages after 3 seconds
+    if (type === "success" && message) {
+      metaStatusTimer = setTimeout(() => {
+        metaNote.hidden = true;
+        metaNote.textContent = "";
+        metaNote.classList.remove("is-error", "is-success");
+        metaStatusTimer = null;
+      }, 3000);
+    }
   }
 
   function setFeedState(message, type) {
@@ -127,7 +143,7 @@
     }
 
     if (avatarEl) {
-      renderAvatar(avatarEl, profile || { username: (email || "clashly").split("@")[0] });
+      renderAvatar(avatarEl, profile || { username: (email || "clashe").split("@")[0] });
     }
 
     if (takesCountEl) takesCountEl.textContent = String(currentTakes.length);
@@ -324,7 +340,9 @@
 
       renderProfile(currentProfile, currentUser.email || "");
       renderActionButtons();
-      setMetaStatus("Profile updated.", "success");
+      if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+        window.ClashlyUtils.showToast("Profile updated", "success");
+      }
       closeEditProfileModal();
     } catch (error) {
       setEditProfileStatus(window.ClashlyUtils.reportError("Profile update failed.", error, "Could not update profile."), "error");
@@ -389,10 +407,18 @@
       `Disagree ${Number(vote.disagree_count || 0)}`,
       `Votes ${Number(vote.total_votes || 0)}`,
     ];
+    const cleanContent =
+      window.ClashlyUtils && typeof window.ClashlyUtils.stripTrailingHashtags === "function"
+        ? window.ClashlyUtils.stripTrailingHashtags(take.content)
+        : take.content;
     const contentMarkup =
       window.ClashlyUtils && typeof window.ClashlyUtils.linkifyHashtags === "function"
-        ? window.ClashlyUtils.linkifyHashtags(take.content)
-        : window.ClashlyUtils.escapeHtml(take.content);
+        ? window.ClashlyUtils.linkifyHashtags(cleanContent || take.content)
+        : window.ClashlyUtils.escapeHtml(cleanContent || take.content);
+    const hashtagsMarkup =
+      window.ClashlyUtils && typeof window.ClashlyUtils.renderTakeHashtags === "function"
+        ? window.ClashlyUtils.renderTakeHashtags(take.content, take.hashtags)
+        : "";
 
     container.innerHTML = `
       <article class="profile-highlight__card">
@@ -401,6 +427,7 @@
           <span>${window.ClashlyUtils.escapeHtml(metaTime)}</span>
         </div>
         <p class="profile-highlight__text">${contentMarkup}</p>
+        ${hashtagsMarkup}
         <div class="profile-highlight__stats">
           ${stats.map((stat) => `<span>${window.ClashlyUtils.escapeHtml(stat)}</span>`).join("")}
         </div>
@@ -852,12 +879,16 @@
     try {
       if (navigator.share) {
         await navigator.share(payload);
-        setMetaStatus("Profile shared.", "success");
+        if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+          window.ClashlyUtils.showToast("Profile shared", "success");
+        }
         return;
       }
 
       await window.ClashlyUtils.copyText(payload.url);
-      setMetaStatus("Profile link copied.", "success");
+      if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+        window.ClashlyUtils.showToast("Profile link copied", "success");
+      }
     } catch (error) {
       if (error && error.name === "AbortError") {
         return;
@@ -927,7 +958,9 @@
           try {
             await navigator.share(payload);
             closeProfileShareModal();
-            setMetaStatus("Profile shared.", "success");
+            if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+              window.ClashlyUtils.showToast("Profile shared", "success");
+            }
             return;
           } catch (error) {
             if (error && error.name === "AbortError") {
@@ -953,7 +986,9 @@
         if (navigator.share) {
           await navigator.share(payload);
           closeProfileShareModal();
-          setMetaStatus("Profile shared.", "success");
+          if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+            window.ClashlyUtils.showToast("Profile shared", "success");
+          }
           return;
         }
 
@@ -1160,7 +1195,9 @@
       renderProfile(currentProfile, currentUser.email || "");
       renderProfileInsights();
       renderProfileFeed();
-      setFeedState("Take deleted.", "success");
+      if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+        window.ClashlyUtils.showToast("Take deleted", "success");
+      }
     } catch (error) {
       updateTakeDeleteLoadingState(input.takeId, false);
       renderProfileFeed();
@@ -1225,9 +1262,13 @@
       };
       renderProfile(currentProfile, currentUser.email || "");
       renderActionButtons();
-      setMetaStatus(isFollowing ? "Now following this profile." : "Unfollowed profile.", "success");
+      // Silent optimistic update - no intrusive banners
     } catch (error) {
-      setMetaStatus(window.ClashlyUtils.reportError("Follow toggle failed.", error, "Could not update follow state."), "error");
+      if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+        window.ClashlyUtils.showToast("Could not update follow state.", "error");
+      } else {
+        setMetaStatus(window.ClashlyUtils.reportError("Follow toggle failed.", error, "Could not update follow state."), "error");
+      }
     } finally {
       button.disabled = false;
     }
@@ -1530,25 +1571,116 @@
     });
   }
 
+  function handleTakeCreated(event) {
+    const newTake = event && event.detail && event.detail.take;
+    if (!newTake || !currentProfile || !currentUser) return;
+    if (newTake.user_id !== currentProfile.id) return;
+    if (!currentTakes.some((t) => t.id === newTake.id)) {
+      currentTakes.unshift(newTake);
+    }
+    const countEl = document.getElementById("takes-count");
+    if (countEl) {
+      const currentVal = parseInt(countEl.textContent || "0", 10) || 0;
+      countEl.textContent = String(currentVal + 1);
+    }
+    renderProfileInsights();
+    renderProfileFeed();
+  }
+
+  function handleTakeUpdated(event) {
+    const updatedTake = event && event.detail && event.detail.take;
+    if (!updatedTake || !updatedTake.id) return;
+    currentTakes = currentTakes.map((t) => (t.id === updatedTake.id ? { ...t, ...updatedTake } : t));
+    currentSavedTakes = currentSavedTakes.map((t) => (t.id === updatedTake.id ? { ...t, ...updatedTake } : t));
+    renderProfileFeed();
+  }
+
+  function handleTakeBookmarkUpdated(event) {
+    const detail = event && event.detail;
+    if (!detail || !detail.takeId) return;
+    currentTakes = currentTakes.map((t) => (t.id === detail.takeId ? { ...t, bookmarked: Boolean(detail.bookmarked) } : t));
+    if (!detail.bookmarked) {
+      currentSavedTakes = currentSavedTakes.filter((t) => t.id !== detail.takeId);
+    }
+    renderProfileFeed();
+    saveCurrentProfileState();
+  }
+
+  function saveCurrentProfileState() {
+    if (!window.ClasheCache || !currentProfile) return;
+    const targetKey = "profile_" + (currentProfile.username || currentProfile.id || "me");
+    window.ClasheCache.savePageState(targetKey, {
+      profile: currentProfile,
+      takes: currentTakes,
+      savedTakes: currentSavedTakes,
+      isOwnProfile,
+      followStats,
+      isFollowing,
+    });
+  }
+
   async function initProfileUI() {
-    // Show skeleton immediately — before any async work — so there is no blank screen
-    if (typeof window.clasheShowProfileSkeleton === "function") {
-      window.clasheShowProfileSkeleton();
+    const target = resolveViewedProfileTarget("");
+    const cacheKey = "profile_" + (target.username || target.id || "me");
+    const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey) : null;
+    const cachedData = cachedRecord && cachedRecord.data;
+
+    if (cachedData && cachedData.profile) {
+      // Instant SWR hydration from cache
+      currentProfile = cachedData.profile;
+      currentTakes = cachedData.takes || [];
+      currentSavedTakes = cachedData.savedTakes || [];
+      isOwnProfile = Boolean(cachedData.isOwnProfile);
+      followStats = cachedData.followStats || followStats;
+      isFollowing = Boolean(cachedData.isFollowing);
+
+      if (typeof window.clasheRemoveProfileSkeleton === "function") {
+        window.clasheRemoveProfileSkeleton();
+      }
+
+      renderProfile(currentProfile, "");
+      renderActionButtons();
+      renderProfileInsights();
+      renderProfileFeed();
+      if (typeof cachedRecord.scroll === "number" && cachedRecord.scroll > 0) {
+        window.ClasheCache.restoreScroll(cacheKey);
+      }
+    } else {
+      // Show skeleton only on first/cold load
+      if (typeof window.clasheShowProfileSkeleton === "function") {
+        window.clasheShowProfileSkeleton();
+      }
+      if (typeof window.clasheShowFeedSkeleton === "function") {
+        window.clasheShowFeedSkeleton("profile-feed", 4);
+      }
     }
-    if (typeof window.clasheShowFeedSkeleton === "function") {
-      window.clasheShowFeedSkeleton("profile-feed", 4);
-    }
+
     try {
       setActiveTab("takes");
       setActiveView("list");
       bindControls();
       bindProfileInfiniteScroll();
-      if (window.ClashlyApp && window.ClashlyApp.createEventName) {
-        window.addEventListener(window.ClashlyApp.createEventName, handleTakeCreated);
-      }
+
+      // Save scroll and profile state before navigating away
+      window.addEventListener("pagehide", () => {
+        if (window.ClasheCache) {
+          saveCurrentProfileState();
+          window.ClasheCache.saveScroll(cacheKey);
+        }
+      });
+      window.addEventListener("beforeunload", () => {
+        if (window.ClasheCache) {
+          saveCurrentProfileState();
+          window.ClasheCache.saveScroll(cacheKey);
+        }
+      });
+
+      const createEvent = (window.ClashlyApp && window.ClashlyApp.createEventName) || "clashly:take-created";
+      window.addEventListener(createEvent, handleTakeCreated);
       window.addEventListener("clashly:take-updated", handleTakeUpdated);
       window.addEventListener("clashly:take-bookmark-updated", handleTakeBookmarkUpdated);
       await loadProfileData();
+      saveCurrentProfileState();
     } finally {
       if (window.ClasheLoader) {
         window.ClasheLoader.release("page-data");
@@ -1556,5 +1688,39 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", initProfileUI);
+  function tryFastSyncHydrateProfile() {
+    const target = resolveViewedProfileTarget("");
+    const cacheKey = "profile_" + (target.username || target.id || "me");
+    const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey) : null;
+    const cachedData = cachedRecord && cachedRecord.data;
+
+    if (cachedData && cachedData.profile) {
+      currentProfile = cachedData.profile;
+      currentTakes = cachedData.takes || [];
+      currentSavedTakes = cachedData.savedTakes || [];
+      isOwnProfile = Boolean(cachedData.isOwnProfile);
+      followStats = cachedData.followStats || followStats;
+      isFollowing = Boolean(cachedData.isFollowing);
+
+      if (typeof window.clasheRemoveProfileSkeleton === "function") {
+        window.clasheRemoveProfileSkeleton();
+      }
+
+      renderProfile(currentProfile, "");
+      renderActionButtons();
+      renderProfileInsights();
+      renderProfileFeed();
+      if (typeof cachedRecord.scroll === "number" && cachedRecord.scroll > 0) {
+        window.ClasheCache.restoreScroll(cacheKey);
+      }
+    }
+  }
+
+  tryFastSyncHydrateProfile();
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initProfileUI);
+  } else {
+    initProfileUI();
+  }
 })();

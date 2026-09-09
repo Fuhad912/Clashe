@@ -328,6 +328,96 @@
     }
   }
 
+
+  async function initEmailNotificationSettings(userId) {
+    const masterToggle = document.getElementById("settings-email-toggle");
+    const followToggle = document.getElementById("settings-email-follow-toggle");
+    const commentToggle = document.getElementById("settings-email-comment-toggle");
+    const likeToggle = document.getElementById("settings-email-like-toggle");
+    const suboptionsContainer = document.getElementById("settings-email-suboptions");
+    const statusEl = document.getElementById("settings-email-pref-status");
+
+    if (!masterToggle || !followToggle || !commentToggle || !likeToggle) return;
+
+    function setSwitchState(el, isChecked) {
+      if (!el) return;
+      el.setAttribute("aria-checked", isChecked ? "true" : "false");
+    }
+
+    function getSwitchState(el) {
+      return el ? el.getAttribute("aria-checked") === "true" : true;
+    }
+
+    function syncSuboptionsState(isEnabled) {
+      if (suboptionsContainer) {
+        suboptionsContainer.classList.toggle("is-disabled", !isEnabled);
+      }
+    }
+
+    function showStatus(msg, type) {
+      if (!statusEl) return;
+      statusEl.hidden = !msg;
+      statusEl.textContent = msg || "";
+      statusEl.classList.remove("is-error", "is-success");
+      if (type === "error") statusEl.classList.add("is-error");
+      if (type === "success") statusEl.classList.add("is-success");
+    }
+
+    let currentPrefs = {
+      email_notifications_enabled: true,
+      email_on_follow: true,
+      email_on_comment: true,
+      email_on_reply: true,
+      email_on_like: true,
+    };
+
+    if (window.ClashlyEmail && typeof window.ClashlyEmail.getEmailPreferences === "function") {
+      try {
+        currentPrefs = await window.ClashlyEmail.getEmailPreferences(userId);
+      } catch (_e) {}
+    }
+
+    setSwitchState(masterToggle, currentPrefs.email_notifications_enabled !== false);
+    setSwitchState(followToggle, currentPrefs.email_on_follow !== false);
+    setSwitchState(commentToggle, currentPrefs.email_on_comment !== false);
+    setSwitchState(likeToggle, currentPrefs.email_on_like !== false);
+    syncSuboptionsState(currentPrefs.email_notifications_enabled !== false);
+
+    async function persistChanges() {
+      const updated = {
+        email_notifications_enabled: getSwitchState(masterToggle),
+        email_on_follow: getSwitchState(followToggle),
+        email_on_comment: getSwitchState(commentToggle),
+        email_on_reply: getSwitchState(commentToggle),
+        email_on_like: getSwitchState(likeToggle),
+      };
+
+      if (window.ClashlyEmail && typeof window.ClashlyEmail.updateEmailPreferences === "function") {
+        const result = await window.ClashlyEmail.updateEmailPreferences(userId, updated);
+        if (result && result.error) {
+          showStatus("Could not sync email preferences with cloud.", "error");
+        } else {
+          showStatus("Email preferences updated.", "success");
+          setTimeout(() => showStatus("", ""), 3000);
+        }
+      }
+    }
+
+    masterToggle.addEventListener("click", () => {
+      const next = !getSwitchState(masterToggle);
+      setSwitchState(masterToggle, next);
+      syncSuboptionsState(next);
+      persistChanges().catch(() => {});
+    });
+
+    [followToggle, commentToggle, likeToggle].forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setSwitchState(btn, !getSwitchState(btn));
+        persistChanges().catch(() => {});
+      });
+    });
+  }
+
   async function initSettingsPage() {
     try {
       if (!window.ClashlySession) return;
@@ -393,6 +483,9 @@
           openDeleteModal();
         });
       }
+
+      // Initialise email notification toggles now that we have a user ID
+      await initEmailNotificationSettings(user.id);
 
       const { modal, confirmBtn } = getDeleteModalElements();
       if (confirmBtn) {

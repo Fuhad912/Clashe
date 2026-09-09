@@ -147,16 +147,18 @@
 
 .comments-drawer__media-frame {
   width: 100%;
-  height: 100%;
+  aspect-ratio: 16 / 9;
 }
 
 .comments-drawer__media-frame--split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  aspect-ratio: auto;
 }
 
 .comments-drawer__media-slot {
   min-width: 0;
+  aspect-ratio: 7 / 8;
 }
 
 .comments-drawer__media-slot + .comments-drawer__media-slot {
@@ -167,7 +169,7 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: cover;  object-position: center;
 }
 
 .comments-drawer__discussion {
@@ -198,6 +200,60 @@
 
 .comments-drawer__body .comments-shell {
   min-height: 100%;
+  position: relative;
+}
+
+.comments-drawer__new-pill {
+  position: sticky;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  margin: 0 auto 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: var(--color-brand-contrast, #ffffff);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+  animation: commentsPillPop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.comments-drawer__new-pill[hidden] {
+  display: none !important;
+}
+
+.comments-drawer__new-pill:hover {
+  transform: translateX(-50%) translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.comments-drawer__new-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.comments-drawer__new-pill-icon svg {
+  display: block;
+}
+
+@keyframes commentsPillPop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 .comments-drawer__body .comments-shell__head {
@@ -223,8 +279,6 @@
 }
 
 .comments-sort__icon {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
   width: 18px;
   height: 18px;
@@ -405,7 +459,7 @@
   }
 
   .comments-drawer__stage--media {
-    grid-template-rows: minmax(0, 0.9fr) minmax(280px, 1.1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
   }
 
   .comments-drawer__take {

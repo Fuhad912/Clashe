@@ -261,3 +261,51 @@ body.has-settings-confirm-open {
     padding-bottom: 0;
   }
 }
+
+
+/* ── Settings Switch & Email Suboptions ────────────────────── */
+.settings-switch {
+  width: 38px;
+  height: 22px;
+  border: var(--line);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface-strong);
+  transition: background 180ms ease, border-color 180ms ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.settings-switch__thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.settings-switch[aria-checked="true"] {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+.settings-switch[aria-checked="true"] .settings-switch__thumb {
+  transform: translateX(16px);
+  background: var(--color-brand-contrast, #ffffff);
+}
+
+.settings-suboptions {
+  display: grid;
+  gap: 14px;
+  margin-top: 6px;
+  padding-left: 14px;
+  border-left: 2px solid var(--color-border);
+  transition: opacity 180ms ease;
+}
+
+.settings-suboptions.is-disabled {
+  opacity: 0.38;
+  pointer-events: none;
+}

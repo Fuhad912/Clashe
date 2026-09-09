@@ -44,6 +44,59 @@
     return html;
   }
 
+  function stripTrailingHashtags(content) {
+    const str = String(content || "").trim();
+    if (!str) return "";
+    if (/^(?:#[a-z0-9_]+[\s,]*)+$/i.test(str)) {
+      return "";
+    }
+    const trailingHashtagPattern = /(?:[\s,]+#[a-z0-9_]+)+[\s,]*$/i;
+    const match = trailingHashtagPattern.exec(str);
+    if (match) {
+      let candidate = str.slice(0, match.index).trim();
+      if (/^(?:#[a-z0-9_]+[\s,]*)+$/i.test(candidate)) {
+        return "";
+      }
+      candidate = candidate.replace(/\s*[:\-]\s*$/, "").trim();
+      return candidate;
+    }
+    return str;
+  }
+
+  function extractTakeHashtags(content, explicitHashtags) {
+    const list = [];
+    const seen = new Set();
+
+    const addTag = (raw) => {
+      const clean = normalizeHashtag(raw);
+      if (/^[a-z0-9_]{1,32}$/.test(clean) && !seen.has(clean)) {
+        seen.add(clean);
+        list.push(clean);
+      }
+    };
+
+    if (Array.isArray(explicitHashtags)) {
+      explicitHashtags.forEach(addTag);
+    }
+
+    const matches = String(content || "").match(/#[a-z0-9_]+/gi) || [];
+    matches.forEach(addTag);
+
+    return list;
+  }
+
+  function renderTakeHashtags(content, explicitHashtags) {
+    const tags = extractTakeHashtags(content, explicitHashtags);
+    if (!tags.length) return "";
+    const items = tags
+      .map(
+        (tag) =>
+          `<a class="take-hashtag" href="hashtag.html?tag=${encodeURIComponent(tag)}">#${escapeHtml(tag)}</a>`
+      )
+      .join("");
+    return `<div class="take-item__hashtags" aria-label="Take hashtags">${items}</div>`;
+  }
+
   function formatRelativeTime(isoDate) {
     if (!isoDate) return "now";
 
@@ -110,6 +163,48 @@
     return fallbackMessage || "Something went wrong.";
   }
 
+  let activeToast = null;
+  let activeToastTimer = null;
+
+  function showToast(message, type = "info", duration = 2400) {
+    if (!message) return;
+
+    let container = document.getElementById("clashe-toast-container");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "clashe-toast-container";
+      container.className = "clashe-toast-container";
+      container.setAttribute("aria-live", "polite");
+      document.body.appendChild(container);
+    }
+
+    if (activeToast) {
+      if (activeToastTimer) clearTimeout(activeToastTimer);
+      activeToast.remove();
+      activeToast = null;
+    }
+
+    const toast = document.createElement("div");
+    toast.className = `clashe-toast clashe-toast--${type}`;
+    toast.textContent = message;
+
+    container.appendChild(toast);
+    activeToast = toast;
+
+    // Trigger animation in next frame
+    requestAnimationFrame(() => {
+      toast.classList.add("is-visible");
+    });
+
+    activeToastTimer = setTimeout(() => {
+      toast.classList.remove("is-visible");
+      setTimeout(() => {
+        if (toast.parentElement) toast.remove();
+        if (activeToast === toast) activeToast = null;
+      }, 240);
+    }, duration);
+  }
+
   window.ClashlyUtils = {
     escapeHtml,
     formatRelativeTime,
@@ -117,7 +212,13 @@
     initialsFromName,
     linkifyHashtags,
     normalizeHashtag,
+    stripTrailingHashtags,
+    extractTakeHashtags,
+    renderTakeHashtags,
     toTakeUrl,
     reportError,
+    showToast,
   };
+
+  window.ClasheToast = showToast;
 })();

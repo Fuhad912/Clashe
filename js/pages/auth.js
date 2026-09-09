@@ -963,4 +963,21 @@
       }
     });
   });
+
+  // Clicking Google/X disables both buttons right before the browser
+  // navigates away to the provider's real sign-in page (see
+  // setOauthButtonsDisabled above) — correct while that navigation is in
+  // flight, since the page is about to be replaced anyway. The bug this
+  // fixes: if the person backs out of the provider's page (closes the tab,
+  // hits back, doesn't finish authorizing) instead of completing the OAuth
+  // redirect, some browsers restore this auth page from the back/forward
+  // cache (bfcache) exactly as it was frozen — disabled buttons included —
+  // rather than reloading it fresh, so DOMContentLoaded never re-fires and
+  // nothing re-enables them. `pageshow` with `event.persisted === true` is
+  // the standard signal for exactly this "restored from bfcache" case.
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      setOauthButtonsDisabled(false);
+    }
+  });
 })();

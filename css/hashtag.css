@@ -294,7 +294,7 @@ body[data-page="hashtag"] .feed-column {
 
 .hashtag-related__chip:hover {
   background: var(--color-surface);
-  border-color: rgba(255, 111, 77, 0.18);
+  border-color: var(--color-border-strong);
   transform: translateY(-1px);
 }
 

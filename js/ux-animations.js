@@ -164,11 +164,28 @@
     const rows = getFresh(root, rowSelectors, ROW_ATTR);
     if (!rows.length) return;
 
+    if (!isInitialPass) {
+      // Dynamic rows during infinite scroll:
+      // Fade in smoothly without vertical translateY (which drops 120Hz frames during momentum scroll)
+      gsap.fromTo(
+        rows,
+        { opacity: 0 },
+        {
+          opacity: 1,
+          duration: 0.18,
+          ease: "power1.out",
+          clearProps: "opacity",
+          overwrite: "auto",
+        }
+      );
+      return;
+    }
+
     gsap.from(rows, {
       opacity: 0,
-      y: isInitialPass ? 14 : 10,
-      duration: isInitialPass ? 0.38 : 0.3,
-      stagger: isInitialPass ? 0.042 : 0.018,
+      y: 14,
+      duration: 0.38,
+      stagger: 0.038,
       ease: "power2.out",
       clearProps: "transform,opacity",
       overwrite: "auto",

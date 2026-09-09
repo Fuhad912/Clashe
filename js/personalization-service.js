@@ -1,4 +1,4 @@
-](function () {
+(function () {
   const SIGNALS_TABLE = "user_interest_signals";
   const COMMENTS_TABLE = "comments";
   const VOTES_TABLE = "votes";
@@ -952,6 +952,68 @@
     return score;
   }
 
+  // Every EXPLORE_SLOT_INTERVAL-th feed position is reserved for a post
+  // outside the person's established interests — a different category and a
+  // different author than their top signals — so the feed doesn't collapse
+  // into a pure echo chamber of "more of what you already engage with".
+  // Within that reserved slot we still pick the *best* eligible candidate
+  // (by engagement) rather than a random one, so it's a real discovery pick,
+  // not filler.
+  const EXPLORE_SLOT_INTERVAL = 8;
+
+  function isOutsideTopInterests(take, topInterests) {
+    const topCategories = new Set((topInterests.categories || []).map((slug) => String(slug || "").toLowerCase()));
+    const topAuthors = new Set(topInterests.authors || []);
+    const categorySlug = take && take.category && take.category.slug ? String(take.category.slug).toLowerCase() : "";
+    const authorId = take && take.user_id ? take.user_id : "";
+
+    if (categorySlug && topCategories.has(categorySlug)) return false;
+    if (authorId && topAuthors.has(authorId)) return false;
+    return true;
+  }
+
+  function engagementScoreForExplore(take) {
+    const vote = take.vote || {};
+    return normalizeCount(vote.total_votes) + normalizeCount(take.comment_count) * 1.5;
+  }
+
+  function injectExploreSlots(rankedTakes, topInterests) {
+    if (!topInterests || !topInterests.hasSignals) return rankedTakes;
+    const hasAnyTopInterest = (topInterests.categories && topInterests.categories.length) || (topInterests.authors && topInterests.authors.length);
+    if (!hasAnyTopInterest) return rankedTakes;
+
+    const result = rankedTakes.slice();
+    const usedIds = new Set();
+
+    for (let position = EXPLORE_SLOT_INTERVAL - 1; position < result.length; position += EXPLORE_SLOT_INTERVAL) {
+      // Candidates: everything ranked below this position that we haven't
+      // already pulled forward for an earlier explore slot, and that sits
+      // outside the person's top categories/authors.
+      let bestIndex = -1;
+      let bestScore = -Infinity;
+      for (let i = position + 1; i < result.length; i += 1) {
+        const candidate = result[i];
+        const candidateId = String(candidate && candidate.id || "");
+        if (usedIds.has(candidateId)) continue;
+        if (!isOutsideTopInterests(candidate, topInterests)) continue;
+        const score = engagementScoreForExplore(candidate);
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = i;
+        }
+      }
+
+      if (bestIndex === -1) continue;
+
+      const [explorePick] = result.splice(bestIndex, 1);
+      explorePick.for_you_is_explore = true;
+      result.splice(position, 0, explorePick);
+      usedIds.add(String(explorePick.id || ""));
+    }
+
+    return result;
+  }
+
   async function rankForYou(takes, userId) {
     const safeTakes = Array.isArray(takes) ? takes.slice() : [];
     if (!safeTakes.length) {
@@ -991,9 +1053,11 @@
       })
     );
 
+    const withExplore = injectExploreSlots(ranked, signalSummary);
+
     return {
-      takes: ranked,
-      meta: buildFeedSummary(userId, ranked),
+      takes: withExplore,
+      meta: buildFeedSummary(userId, withExplore),
     };
   }
 

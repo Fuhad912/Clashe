@@ -379,10 +379,14 @@
     const mediaMarkup = hasImage
       ? imageUrls.length === 1
         ? `
-          <div class="take-item__media">
-            <img src="${window.ClashlyUtils.escapeHtml(imageUrls[0])}" alt="Take image from ${window.ClashlyUtils.escapeHtml(
-              username
-            )}" loading="lazy" decoding="async" />
+          <div class="take-item__media" data-media-shape="pending">
+            <img
+              src="${window.ClashlyUtils.escapeHtml(imageUrls[0])}"
+              alt="Take image from ${window.ClashlyUtils.escapeHtml(username)}"
+              loading="lazy"
+              decoding="async"
+              onload="window.ClashlyTakeRenderer.applyImageAspectRatio(this)"
+            />
           </div>
         `
         : `
@@ -390,12 +394,13 @@
             ${imageUrls
               .map(
                 (imageUrl, index) => `
-                  <div class="take-item__media-slot">
+                  <div class="take-item__media-slot" data-media-shape="pending">
                     <img
                       src="${window.ClashlyUtils.escapeHtml(imageUrl)}"
                       alt="Take image ${index + 1} from ${window.ClashlyUtils.escapeHtml(username)}"
                       loading="lazy"
                       decoding="async"
+                      onload="window.ClashlyTakeRenderer.applyImageAspectRatio(this)"
                     />
                   </div>
                 `
@@ -403,6 +408,18 @@
               .join("")}
           </div>
         `
+      : "";
+
+    const cleanContent =
+      window.ClashlyUtils && typeof window.ClashlyUtils.stripTrailingHashtags === "function"
+        ? window.ClashlyUtils.stripTrailingHashtags(take.content)
+        : take.content;
+    const hashtagsMarkup =
+      window.ClashlyUtils && typeof window.ClashlyUtils.renderTakeHashtags === "function"
+        ? window.ClashlyUtils.renderTakeHashtags(take.content, take.hashtags)
+        : "";
+    const textMarkup = cleanContent
+      ? `<p class="take-item__text">${renderTakeText(cleanContent)}</p>`
       : "";
 
     return `
@@ -421,7 +438,8 @@
             </div>
             ${mobileShareAction}
           </header>
-          <p class="take-item__text">${renderTakeText(take.content)}</p>
+          ${textMarkup}
+          ${hashtagsMarkup}
           ${mediaMarkup}
           ${renderActionRow(take, options)}
         </div>
@@ -433,7 +451,11 @@
     const username = getUsername(take.profile);
     const relativeTime = window.ClashlyUtils.formatRelativeTime(take.created_at);
     const voteData = getVoteData(take);
-    const excerpt = renderTakeText(take.content);
+    const cleanContent =
+      window.ClashlyUtils && typeof window.ClashlyUtils.stripTrailingHashtags === "function"
+        ? window.ClashlyUtils.stripTrailingHashtags(take.content)
+        : take.content;
+    const excerpt = renderTakeText(cleanContent || take.content);
     const hasImage = Boolean(take.image_url);
     const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
     const canDeleteTake = Boolean(options && options.showDeleteAction && currentUserId && take && take.user_id === currentUserId);
@@ -515,6 +537,38 @@
         })
       )
       .join("");
+
+    hydrateCachedImages(container);
+  }
+
+  function appendTakeList(container, takes, options) {
+    if (!container || !takes || !takes.length) return;
+    const safeOptions = options || {};
+
+    const emptyEl = container.querySelector(".feed-empty");
+    if (emptyEl) emptyEl.remove();
+
+    const html = takes
+      .map((take) =>
+        renderListItem(take, {
+          compact: Boolean(safeOptions.compact),
+          currentUserId: safeOptions.currentUserId || "",
+          hideCommentsAction: Boolean(safeOptions.hideCommentsAction),
+          hideShareAction: Boolean(safeOptions.hideShareAction),
+          showAiJudgeAction: Boolean(safeOptions.showAiJudgeAction),
+          showDeleteAction: Boolean(safeOptions.showDeleteAction),
+          hideActionRow: Boolean(safeOptions.hideActionRow),
+          hideInlineAiJudgeResult: Boolean(safeOptions.hideInlineAiJudgeResult),
+          showOpenLink: Boolean(safeOptions.showOpenLink),
+          toggleOpenAction: Boolean(safeOptions.toggleOpenAction),
+          isExpanded: safeOptions.expandedTakeId === take.id,
+          takeHrefSuffix: safeOptions.takeHrefSuffix || "",
+        })
+      )
+      .join("");
+
+    container.insertAdjacentHTML("beforeend", html);
+    hydrateCachedImages(container);
   }
 
   function renderTakeGrid(container, takes, options) {
@@ -623,11 +677,13 @@
 
         try {
           await window.ClashlyUtils.copyText(shareUrl);
-          if (typeof handlers === "function") handlers("Link copied to clipboard.", "success");
-          if (handlers && typeof handlers.onStatus === "function") handlers.onStatus("Link copied to clipboard.", "success");
+          if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+            window.ClashlyUtils.showToast("Link copied to clipboard", "success");
+          }
         } catch (error) {
-          if (typeof handlers === "function") handlers("Could not copy link.", "error");
-          if (handlers && typeof handlers.onStatus === "function") handlers.onStatus("Could not copy link.", "error");
+          if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+            window.ClashlyUtils.showToast("Could not copy link.", "error");
+          }
         }
       });
     });
@@ -660,15 +716,25 @@
   function bindCommentActions(rootEl, handlers) {
     if (!rootEl || !handlers || typeof handlers.onComments !== "function") return;
 
-    const commentLinks = rootEl.querySelectorAll("[data-action='comments']");
-    commentLinks.forEach((link) => {
-      link.addEventListener("click", (event) => {
+    rootEl._onTakeComments = handlers.onComments;
+
+    if (rootEl.dataset.takeCommentsBound !== "true") {
+      rootEl.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const link = target.closest("[data-action='comments']");
+        if (!link || !rootEl.contains(link)) return;
+
         event.preventDefault();
         const takeId = link.getAttribute("data-take-id");
         if (!takeId) return;
-        handlers.onComments({ takeId });
+
+        if (typeof rootEl._onTakeComments === "function") {
+          rootEl._onTakeComments({ takeId });
+        }
       });
-    });
+      rootEl.dataset.takeCommentsBound = "true";
+    }
   }
 
   function bindBookmarkActions(rootEl, handlers) {
@@ -745,8 +811,57 @@
     });
   }
 
+  // Standard Social Media Media Sizing (Facebook, Instagram, X):
+  // - Full width across the post section (100% width) - no side displacement or awkward gaps!
+  // - Single image aspect ratio clamped between 4:5 (universal portrait bound, 0.8) and 16:9 (landscape bound, 1.7778).
+  // - Photos within 4:5 to 16:9 (including 1:1 square, 4:3, 3:2, 16:9) fill the full-width box with zero cropping!
+  // - Ultra-tall photos (taller than 4:5, like 9:16 vertical photos/screenshots) use object-fit: contain inside the 4:5 box
+  //   with a sleek surface background, exactly like Facebook and X, keeping the entire image 100% visible!
+  // - Two images (split view): 16:9 unified grid container with 50/50 slots and 100% height.
+  const SINGLE_IMAGE_MIN_RATIO = 4 / 5; // 0.8 (Instagram/Facebook/X standard portrait bound)
+  const SINGLE_IMAGE_MAX_RATIO = 16 / 9; // 1.7778 (landscape bound)
+
+  function applyImageAspectRatio(imgEl) {
+    if (!imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight) return;
+    const container = imgEl.closest(".take-item__media, .take-item__media-slot");
+    if (!container) return;
+
+    const isSplit = container.classList.contains("take-item__media-slot");
+    const trueRatio = imgEl.naturalWidth / imgEl.naturalHeight;
+
+    if (isSplit) {
+      // In split view, the parent grid (.take-item__media--split) controls the overall ratio
+      // so both slots share equal height.
+      container.style.aspectRatio = "";
+    } else {
+      // Standard social media ratio clamping: 4:5 (portrait) to 16:9 (landscape)
+      const clampedRatio = Math.min(Math.max(trueRatio, SINGLE_IMAGE_MIN_RATIO), SINGLE_IMAGE_MAX_RATIO);
+      container.style.aspectRatio = String(Number(clampedRatio.toFixed(4)));
+    }
+
+    // Always span full 100% width of the post section - no shrinking or sticking to the right!
+    container.style.width = "100%";
+    container.style.maxWidth = "100%";
+
+    // Standard FB/X approach: if photo is taller than 4:5 (e.g. 9:16), use contain to keep 100% of the image visible!
+    // For standard photos (4:5 to 16:9), cover fills the matching aspect-ratio box without cropping.
+    imgEl.style.objectFit = trueRatio < 0.76 ? "contain" : "cover";
+    container.dataset.mediaShape = trueRatio > 1.05 ? "landscape" : trueRatio < 0.95 ? "portrait" : "square";
+  }
+
+  function hydrateCachedImages(rootEl) {
+    if (!rootEl || typeof rootEl.querySelectorAll !== "function") return;
+    const imgs = rootEl.querySelectorAll(".take-item__media img, .take-item__media-slot img");
+    imgs.forEach((img) => {
+      if (img.complete && img.naturalWidth && img.naturalHeight) {
+        applyImageAspectRatio(img);
+      }
+    });
+  }
+
   window.ClashlyTakeRenderer = {
     renderTakeList,
+    appendTakeList,
     renderTakeGrid,
     syncTakeState,
     bindShareActions,
@@ -755,5 +870,7 @@
     bindBookmarkActions,
     bindAiJudgeActions,
     bindDeleteActions,
+    applyImageAspectRatio,
+    hydrateCachedImages,
   };
 })();

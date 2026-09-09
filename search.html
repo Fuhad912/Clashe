@@ -15,6 +15,8 @@
     <script src="js/pwa-capture.js"></script>
     <script src="js/theme.js"></script>
     <script src="js/loader.js"></script>
+    <script src="js/cache-service.js"></script>
+    <script src="js/prefetch.js"></script>
     <link rel="icon" type="image/svg+xml" href="assets/clashly-favicon.svg?v=20260311a" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="assets/pwa-192.png" />
@@ -39,6 +41,12 @@
     <main class="app-main app-main--search">
       <section class="search-shell">
         <header class="feed-head search-shell__head">
+          <a id="search-back-link" class="search-back-link" href="search.html" hidden aria-label="Back to search discovery">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+            <span>Back to search</span>
+          </a>
           <div class="search-shell__title">
             <h1 id="search-title" class="page-title">Results</h1>
             <p id="search-subtitle" class="section-subtitle">Search takes, users, and hashtags.</p>
@@ -65,42 +73,15 @@
 
         <section id="search-discovery" class="search-discovery" hidden>
           <header class="search-discovery__head">
-            <p class="search-hero__eyebrow">Search floor</p>
-            <h2 class="search-discovery__title">Pick up where you left off</h2>
-            <p class="search-discovery__subtitle">Your recent searches and what's trending across Clashe right now.</p>
+            <h2 class="search-discovery__title">Trending now</h2>
           </header>
 
-          <div class="search-panels">
-            <section id="search-recents-panel" class="search-panel" hidden>
-              <div class="search-panel__bar">
-                <h3 class="search-panel__title">Recent searches</h3>
-                <button type="button" id="search-recents-clear" class="search-panel__clear" hidden>Clear all</button>
-              </div>
-              <div id="search-recents-list" class="search-recents"></div>
-            </section>
-
-            <section class="search-panel">
-              <div class="search-panel__bar">
-                <h3 class="search-panel__title">Trending now</h3>
-              </div>
-              <p id="search-trending-state" class="search-discovery__state">Loading live lanes...</p>
-              <div id="search-trending-topics" class="search-topic-grid" aria-label="Trending hashtags" hidden></div>
-            </section>
-          </div>
+          <section class="trends-section" aria-label="Trends">
+            <p id="search-trending-state" class="search-discovery__state">Loading trends...</p>
+            <div id="search-trending-topics" class="trends-list" aria-label="Trending topics" hidden></div>
+          </section>
         </section>
 
-        <section id="search-social-summary" class="search-social-summary" hidden>
-          <div class="search-social-summary__main">
-            <p class="search-social-summary__eyebrow">Search pulse</p>
-            <div class="search-social-summary__headline">
-              <h2 class="search-social-summary__title">Results moving around your query</h2>
-              <span id="search-social-query" class="search-social-summary__query"></span>
-            </div>
-            <p id="search-social-line" class="search-social-summary__line"></p>
-            <a id="search-social-cta" class="search-social-summary__cta" href="#" hidden></a>
-          </div>
-          <div id="search-social-stats" class="search-social-summary__stats"></div>
-        </section>
 
         <p id="search-state" class="feed-state">Searching...</p>
         <p id="search-empty" class="feed-empty" hidden>No results found.</p>
@@ -163,11 +144,13 @@
     <script src="js/auth-service.js"></script>
     <script src="js/profile-service.js"></script>
     <script src="js/notifications-service.js"></script>
+    <script src="js/email-service.js"></script>
     <script src="js/follows-service.js"></script>
     <script src="js/session.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/personalization-service.js"></script>
     <script src="js/categories-service.js"></script>
+    <script src="js/category-modal.js"></script>
     <script src="js/takes-service.js"></script>
     <script src="js/ai-judge-service.js"></script>
     <script src="js/search-service.js"></script>
@@ -178,6 +161,7 @@
     <script src="js/comments-modal.js"></script>
     <script src="js/share-modal.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/pwa-install-gate.js"></script>
     <script src="js/pages/search.js"></script>
   </body>
 </html>

@@ -31,7 +31,7 @@
   }
 
   function initialsFromUsername(username) {
-    const safe = (username || "clashly").replace("@", "").trim();
+    const safe = (username || "clashe").replace("@", "").trim();
     return safe.slice(0, 2).toUpperCase();
   }
 

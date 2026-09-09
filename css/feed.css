@@ -4,11 +4,13 @@
 
 .feed-stream {
   display: block;
+  contain: layout;
 }
 
 body[data-page="home"] #feed-stream {
   display: block;
   padding: 0 var(--space-4) var(--space-5);
+  contain: layout;
 }
 
 body[data-page="home"] #feed-stream .take-item {
@@ -18,6 +20,9 @@ body[data-page="home"] #feed-stream .take-item {
   box-shadow: none;
   background: transparent;
   gap: 12px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+  contain: layout style;
 }
 
 body[data-page="home"] #feed-stream .take-item + .take-item {
@@ -380,6 +385,9 @@ body[data-page="home"] .feed-head__inner {
   padding: 14px var(--space-4);
   border-bottom: var(--line);
   transition: background var(--transition-fast);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+  contain: layout style;
 }
 
 .take-item:hover {
@@ -492,25 +500,66 @@ body[data-page="home"] .feed-head__inner {
   letter-spacing: -0.01em;
   word-break: break-word;
   overflow-wrap: break-word;
+  white-space: pre-line;
 }
-
 
 /* ── Hashtags ──────────────────────────────────────────────── */
 
+.take-item__hashtags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+
 .take-hashtag {
-  color: var(--color-text);
-  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--color-text-muted);
   text-decoration: none;
-  border-bottom: 1.5px solid var(--color-border-strong);
-  transition: border-color var(--transition-fast), opacity var(--transition-fast);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1px;
+  transition: color var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
 }
 
 .take-hashtag:hover {
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+}
+
+.take-item__text .take-hashtag {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: 1.5px solid var(--color-border-strong);
+  padding-bottom: 0;
+}
+
+.take-item__text .take-hashtag:hover {
   opacity: 0.65;
   border-color: var(--color-text);
 }
 
+.take-item__hashtags + .take-item__media {
+  margin-top: 10px;
+}
+
+.take-item__hashtags + .take-item__actions-wrapper {
+  margin-top: 8px;
+}
+
 /* ── Media ─────────────────────────────────────────────────── */
+/* Adaptive bounded media sizing (Bluesky / Threads / modern X style):
+   - Single image: 16:9 initial placeholder ratio before load, then smoothly adapts
+     to the photo's true ratio clamped safely between 4:5 (portrait) and 16:9 (landscape).
+     max-height: min(520px, 68vh) ensures tall photos never dominate the screen.
+   - Two images (split view): 16:9 unified grid container with 50/50 slots and 100% height,
+     ensuring both sides of the clash align side-by-side with identical heights. */
 
 .take-item__media {
   margin-top: 12px;
@@ -518,23 +567,43 @@ body[data-page="home"] .feed-head__inner {
   border-radius: var(--radius-2);
   overflow: hidden;
   background: var(--color-surface-soft);
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  max-width: 100%;
+  max-height: min(700px, 80vh);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: border-color var(--transition-fast);
 }
 
 .take-item__media img {
   width: 100%;
-  max-height: 540px;
+  height: 100%;
+  max-height: inherit;
   object-fit: cover;
+  object-position: center;
   display: block;
 }
 
 .take-item__media--split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  aspect-ratio: 16 / 9;
+  max-height: min(440px, 58vh);
 }
 
 .take-item__media--split .take-item__media-slot {
   min-width: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--color-surface-soft);
+  position: relative;
+  overflow: hidden;
 }
 
 .take-item__media--split .take-item__media-slot + .take-item__media-slot {
@@ -544,8 +613,9 @@ body[data-page="home"] .feed-head__inner {
 .take-item__media--split .take-item__media-slot img {
   width: 100%;
   height: 100%;
-  max-height: 420px;
   object-fit: cover;
+  object-position: center;
+  display: block;
 }
 
 /* ── Action wrapper ────────────────────────────────────────── */
@@ -589,14 +659,20 @@ body[data-page="home"] .feed-head__inner {
   line-height: 1.44;
 }
 
+.feed-stream .take-item__hashtags,
+.profile-feed:not(.profile-feed--grid) .take-item__hashtags {
+  gap: 5px 8px;
+  margin-top: 6px;
+}
+
+.feed-stream .take-item__hashtags .take-hashtag,
+.profile-feed:not(.profile-feed--grid) .take-item__hashtags .take-hashtag {
+  font-size: 0.78rem;
+}
+
 .feed-stream .take-item__media,
 .profile-feed:not(.profile-feed--grid) .take-item__media {
   margin-top: 10px;
-}
-
-.feed-stream .take-item__media img,
-.profile-feed:not(.profile-feed--grid) .take-item__media img {
-  max-height: 400px;
 }
 
 .feed-stream .take-item__actions-wrapper,

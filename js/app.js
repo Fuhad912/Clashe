@@ -29,6 +29,7 @@
   let onboardingShownForUserId = "";
   let deferredInstallPrompt = null;
   let createModalSelectedFiles = [];
+  let createModalCategoryPicker = null;
   let installPromptConsumed = false;
   let serviceWorkerRegistration = null;
   let pwaInitialized = false;
@@ -318,11 +319,15 @@
     const modalAttr = link.opensModal && shouldUseCreateModal() ? ' data-open-create-modal="true"' : "";
     const notificationsAttr =
       link.id === "notifications" && shouldUseNotificationsDrawer() ? ' data-open-notifications-drawer="true"' : "";
+    const unreadMarker =
+      link.id === "notifications"
+        ? '<span class="nav-unread-dot" id="desktop-notifications-dot" hidden aria-hidden="true"></span>'
+        : "";
 
     return `
       <li>
         <a class="desktop-nav__link ${activeClass}" href="${link.href}"${modalAttr}${notificationsAttr}>
-          <span class="desktop-nav__icon desktop-nav__icon--${link.id}">${renderIcon(link.id)}</span>
+          <span class="desktop-nav__icon desktop-nav__icon--${link.id}">${renderIcon(link.id)}${unreadMarker}</span>
           <span class="desktop-nav__label">${link.label}</span>
         </a>
       </li>
@@ -333,12 +338,75 @@
     const activeClass = resolveActiveNavLink(link.id) ? "is-active" : "";
     const createClass = link.id === "create" ? " bottom-nav__link--create" : "";
     const modalAttr = link.opensModal && shouldUseCreateModal() ? ' data-open-create-modal="true"' : "";
+    const unreadMarker =
+      link.id === "notifications"
+        ? '<span class="nav-unread-dot" id="mobile-notifications-dot" hidden aria-hidden="true"></span>'
+        : "";
     return `
       <a class="bottom-nav__link ${activeClass}${createClass}" href="${link.href}"${modalAttr} aria-label="${link.label}">
-        <span class="bottom-nav__icon bottom-nav__icon--${link.id}" aria-hidden="true">${renderIcon(link.id)}</span>
+        <span class="bottom-nav__icon bottom-nav__icon--${link.id}" aria-hidden="true">${renderIcon(link.id)}${unreadMarker}</span>
+        <span class="bottom-nav__label">${link.label}</span>
       </a>
     `;
   }
+  let activeNotificationsSubscription = null;
+
+  function updateNavNotificationBadges(hasUnread) {
+    const desktopDot = document.getElementById("desktop-notifications-dot");
+    const mobileDot = document.getElementById("mobile-notifications-dot");
+
+    [desktopDot, mobileDot].forEach((dot) => {
+      if (!dot) return;
+      if (hasUnread) {
+        dot.hidden = false;
+        requestAnimationFrame(() => dot.classList.add("is-visible"));
+      } else {
+        dot.classList.remove("is-visible");
+        dot.hidden = true;
+      }
+    });
+  }
+
+  async function checkNavNotifications(userId) {
+    if (!userId || !window.ClashlyNotifications) return;
+    if (page === "notifications") {
+      updateNavNotificationBadges(false);
+      return;
+    }
+
+    try {
+      const result = await window.ClashlyNotifications.fetchUnreadCount(userId);
+      const hasUnread = Boolean(result && result.count > 0);
+      updateNavNotificationBadges(hasUnread);
+    } catch (_) {}
+  }
+
+  function initRealtimeNotifications(userId) {
+    if (!userId || !window.ClashlySupabase || activeNotificationsSubscription) return;
+    const client = window.ClashlySupabase.getClient();
+    if (!client || typeof client.channel !== "function") return;
+
+    try {
+      activeNotificationsSubscription = client
+        .channel(`nav-notifs-${userId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            if (page !== "notifications") {
+              updateNavNotificationBadges(true);
+            }
+          }
+        )
+        .subscribe();
+    } catch (_) {}
+  }
+
 
   function buildTopNav() {
     if (!topNavEl) return;
@@ -362,8 +430,78 @@
 
   function buildBottomNav() {
     if (!bottomNavEl) return;
-    bottomNavEl.innerHTML = `<div class="bottom-nav__inner">${mobileLinks.map(buildMobileLink).join("")}</div>`;
+    bottomNavEl.innerHTML = `
+      <div class="bottom-nav__inner">
+        <span class="bottom-nav__active-pill" aria-hidden="true"></span>
+        ${mobileLinks.map(buildMobileLink).join("")}
+      </div>
+    `;
+    positionBottomNavPill();
+    bindBottomNavTapFeedback();
+    // A safety re-measure one frame later, in case web fonts finish
+    // loading and shift the nav's layout right after this first paint.
+    window.requestAnimationFrame(positionBottomNavPill);
   }
+
+  // Positions the shared sliding pill behind whichever tab is marked
+  // .is-active (set server-side per page in buildMobileLink), so on load it
+  // appears already in the right spot, then animates smoothly if a script
+  // re-renders the nav later in the same page view. The create button is
+  // its own raised glass slab and never sits behind this pill.
+  function positionBottomNavPill() {
+    if (!bottomNavEl) return;
+    const inner = bottomNavEl.querySelector(".bottom-nav__inner");
+    const pill = bottomNavEl.querySelector(".bottom-nav__active-pill");
+    const activeLink = bottomNavEl.querySelector(".bottom-nav__link.is-active:not(.bottom-nav__link--create)");
+    if (!inner || !pill) return;
+
+    if (!activeLink) {
+      pill.style.width = "0";
+      return;
+    }
+
+    const innerRect = inner.getBoundingClientRect();
+    const linkRect = activeLink.getBoundingClientRect();
+    const offsetX = linkRect.left - innerRect.left;
+    pill.style.width = `${linkRect.width}px`;
+    pill.style.transform = `translateX(${offsetX}px)`;
+  }
+
+  // Real cross-tab navigation is a full page load (see the view-transition
+  // notes in layout.css for why), so the only animation achievable entirely
+  // within this page view is instant tap feedback the moment someone taps —
+  // a quick press-down on the icon — before the browser hands off to the
+  // next page.
+  function bindBottomNavTapFeedback() {
+    if (!bottomNavEl || bottomNavEl.dataset.tapFeedbackBound === "1") return;
+    bottomNavEl.dataset.tapFeedbackBound = "1";
+
+    bottomNavEl.addEventListener(
+      "pointerdown",
+      (event) => {
+        const link = event.target instanceof Element ? event.target.closest(".bottom-nav__link") : null;
+        if (!link) return;
+        link.classList.add("is-pressed");
+      },
+      { passive: true }
+    );
+
+    bottomNavEl.addEventListener("pointerup", () => {
+      bottomNavEl.querySelectorAll(".bottom-nav__link.is-pressed").forEach((link) => {
+        link.classList.remove("is-pressed");
+      });
+    });
+
+    bottomNavEl.addEventListener("pointerleave", () => {
+      bottomNavEl.querySelectorAll(".bottom-nav__link.is-pressed").forEach((link) => {
+        link.classList.remove("is-pressed");
+      });
+    }, true);
+  }
+
+  window.addEventListener("resize", () => {
+    if (bottomNavEl) positionBottomNavPill();
+  });
 
   function shouldShowLegalFooter() {
     return page !== "auth";
@@ -585,10 +723,13 @@
     if (!user) {
       onboardingShownForUserId = "";
       closeOnboardingModal({ markSeen: false });
+      updateNavNotificationBadges(false);
       return;
     }
 
     maybeShowOnboarding(user.id).catch(() => {});
+    checkNavNotifications(user.id).catch(() => {});
+    initRealtimeNotifications(user.id);
   }
 
   function bindLogoutActions() {
@@ -630,10 +771,30 @@
               <p class="composer-note">Lead with a clear opinion. Up to 3 hashtags.</p>
 
               <div class="composer-media">
-                <label for="create-modal-category" class="field-label">Category</label>
-                <select id="create-modal-category" name="category" required>
-                  <option value="">Loading categories...</option>
-                </select>
+                <label class="field-label" id="create-modal-category-label">Category</label>
+                <input type="hidden" id="create-modal-category" name="category" required value="" />
+                <button
+                  type="button"
+                  class="category-picker-trigger"
+                  id="create-modal-category-trigger"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  aria-labelledby="create-modal-category-label"
+                >
+                  <span class="category-picker-trigger__content">
+                    <span class="category-picker-trigger__icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 7h16M4 12h16M4 17h10"></path>
+                      </svg>
+                    </span>
+                    <span class="category-picker-trigger__text is-placeholder" id="create-modal-category-trigger-text">Select a category</span>
+                  </span>
+                  <span class="category-picker-trigger__chevron" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m6 9 6 6 6-6"></path>
+                    </svg>
+                  </span>
+                </button>
                 <p class="composer-hint">Choose one lane.</p>
               </div>
 
@@ -858,7 +1019,10 @@
     if (unreadIds.length) {
       window.setTimeout(() => {
         markNotificationsDrawerRead(unreadIds).catch(() => {});
+        updateNavNotificationBadges(false);
       }, 180);
+    } else {
+      updateNavNotificationBadges(false);
     }
   }
 
@@ -925,15 +1089,29 @@
     });
   }
 
+  let createStatusTimer = null;
+
   function setCreateStatus(message, type) {
     const { status } = getCreateModalElements();
     if (!status) return;
+
+    if (createStatusTimer) { clearTimeout(createStatusTimer); createStatusTimer = null; }
 
     status.hidden = !message;
     status.textContent = message || "";
     status.classList.remove("is-error", "is-success");
     if (type === "error") status.classList.add("is-error");
     if (type === "success") status.classList.add("is-success");
+
+    // Auto-dismiss success messages after 3 seconds
+    if (type === "success" && message) {
+      createStatusTimer = setTimeout(() => {
+        status.hidden = true;
+        status.textContent = "";
+        status.classList.remove("is-error", "is-success");
+        createStatusTimer = null;
+      }, 3000);
+    }
   }
 
   function updateCreateCount() {
@@ -1005,6 +1183,9 @@
     const { form } = getCreateModalElements();
     if (!form) return;
     form.reset();
+    if (createModalCategoryPicker) {
+      createModalCategoryPicker.reset();
+    }
     createModalSelectedFiles = [];
     resetCreatePreview();
     updateCreateCount();
@@ -1013,7 +1194,7 @@
 
   async function populateCreateCategories() {
     const { categorySelect } = getCreateModalElements();
-    if (!categorySelect || !window.ClashlyCategories) return;
+    if (!categorySelect || categorySelect.tagName !== "SELECT" || !window.ClashlyCategories) return;
 
     categorySelect.innerHTML = `<option value="">Loading categories...</option>`;
 
@@ -1045,10 +1226,22 @@
   }
 
   function openCreateModal() {
-    const { modal, textarea } = getCreateModalElements();
+    const { modal, textarea, categorySelect } = getCreateModalElements();
     if (!modal) return;
     modal.hidden = false;
     document.body.style.overflow = "hidden";
+
+    const trigger = document.getElementById("create-modal-category-trigger");
+    const triggerText = document.getElementById("create-modal-category-trigger-text");
+    if (!createModalCategoryPicker && window.ClasheCategoryModal && trigger && categorySelect) {
+      createModalCategoryPicker = window.ClasheCategoryModal.bindCategoryPicker({
+        triggerEl: trigger,
+        inputEl: categorySelect,
+        textEl: triggerText,
+        onChange: () => setCreateStatus("", ""),
+      });
+    }
+
     window.setTimeout(() => {
       if (textarea) textarea.focus();
     }, 40);
@@ -1067,7 +1260,19 @@
     if (!elements.modal || !elements.form || !window.ClashlyTakes || !window.ClashlySession || !window.ClashlyCategories) return;
 
     updateCreateCount();
-    populateCreateCategories();
+
+    const categoryTrigger = document.getElementById("create-modal-category-trigger");
+    const categoryTriggerText = document.getElementById("create-modal-category-trigger-text");
+    if (window.ClasheCategoryModal && typeof window.ClasheCategoryModal.bindCategoryPicker === "function" && categoryTrigger) {
+      createModalCategoryPicker = window.ClasheCategoryModal.bindCategoryPicker({
+        triggerEl: categoryTrigger,
+        inputEl: elements.categorySelect,
+        textEl: categoryTriggerText,
+        onChange: () => setCreateStatus("", ""),
+      });
+    } else if (elements.categorySelect && elements.categorySelect.tagName === "SELECT") {
+      populateCreateCategories();
+    }
 
     elements.textarea.addEventListener("input", () => {
       setCreateStatus("", "");
@@ -1110,6 +1315,8 @@
       const categoryError = window.ClashlyTakes.validateCategory(elements.categorySelect.value);
       if (categoryError) {
         setCreateStatus(categoryError, "error");
+        const trigger = document.getElementById("create-modal-category-trigger");
+        if (trigger) trigger.focus();
         return;
       }
 
@@ -1126,6 +1333,13 @@
         return;
       }
 
+      // Close create modal and trigger the signature full-screen Clashe loader
+      closeCreateModal();
+      if (window.ClasheLoader && typeof window.ClasheLoader.show === "function") {
+        window.ClasheLoader.show("create-take");
+      }
+
+      const postStartTime = Date.now();
       elements.submit.disabled = true;
       elements.submit.textContent = "Posting...";
 
@@ -1141,7 +1355,10 @@
           throw createResult.error;
         }
 
-        setCreateStatus("Take posted.", "success");
+        resetCreateForm();
+        setCreateStatus("", "");
+
+        // Notify active page (home feed, profile, etc.) to update with new take
         window.dispatchEvent(
           new CustomEvent(CREATE_EVENT, {
             detail: {
@@ -1149,11 +1366,28 @@
             },
           })
         );
-        window.setTimeout(() => {
-          resetCreateForm();
-          closeCreateModal();
-        }, 240);
+
+        // Keep loader visible for a smooth, natural duration (~500ms)
+        const elapsed = Date.now() - postStartTime;
+        const waitMs = Math.max(0, 500 - elapsed);
+        if (waitMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, waitMs));
+        }
+
+        // Release loader — user is back on the page they were on
+        if (window.ClasheLoader && typeof window.ClasheLoader.hide === "function") {
+          window.ClasheLoader.hide("create-take");
+        }
+
+        // Show clean monochrome toast
+        if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+          window.ClashlyUtils.showToast("Take posted", 2500);
+        }
       } catch (error) {
+        if (window.ClasheLoader && typeof window.ClasheLoader.hide === "function") {
+          window.ClasheLoader.hide("create-take");
+        }
+        openCreateModal();
         const message = window.ClashlyUtils.reportError("Create modal post failed.", error, "Could not post take.");
         setCreateStatus(message, "error");
       } finally {
@@ -1184,6 +1418,28 @@
     });
   }
 
+  function bindNavScrollSave() {
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const link = target.closest(".bottom-nav__link, .desktop-nav__link");
+      if (!link) return;
+      if (link.getAttribute("data-open-create-modal") === "true") return;
+      if (link.getAttribute("data-open-notifications-drawer") === "true") return;
+
+      // Tapping the tab you are already on scrolls smoothly to top instead of reloading the page
+      if (link.classList.contains("is-active")) {
+        event.preventDefault();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (window.ClasheCache && page) {
+        window.ClasheCache.saveScroll(page);
+      }
+    });
+  }
+
   function boot() {
     initPwa();
     buildTopNav();
@@ -1196,11 +1452,30 @@
     bindCreateModal();
     bindOnboardingModal();
     bindNotificationsDrawer();
+    bindNavScrollSave();
     syncAuthUi();
     window.addEventListener("clashly:auth-state", syncAuthUi);
+    window.addEventListener("clashly:notifications-read", () => updateNavNotificationBadges(false));
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden && notificationsUserId) {
+        checkNavNotifications(notificationsUserId).catch(() => {});
+      }
+    });
+    window.addEventListener("focus", () => {
+      if (notificationsUserId) {
+        checkNavNotifications(notificationsUserId).catch(() => {});
+      }
+    });
+
+    window.ClasheNav = {
+      updateUnreadNotificationMarker: updateNavNotificationBadges,
+      checkUnread: checkNavNotifications,
+    };
+
     window.ClashlyApp = {
       page,
       openCreateModal,
+      closeCreateModal,
       createEventName: CREATE_EVENT,
     };
 

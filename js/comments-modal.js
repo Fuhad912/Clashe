@@ -12,6 +12,9 @@
   let activeReplyTarget = null;
   let expandedReplyIds = new Set();
   let pendingCommentLikeIds = new Set();
+  let activeCommentsChannel = null;
+  let activeChannelTakeId = "";
+  let unreadNewCommentsCount = 0;
   let dragState = {
     active: false,
     startY: 0,
@@ -82,6 +85,12 @@
                         <option value="oldest">Oldest</option>
                       </select>
                     </label>
+                    <button type="button" id="comments-drawer-new-pill" class="comments-drawer__new-pill" hidden aria-live="polite">
+                      <span class="comments-drawer__new-pill-icon" aria-hidden="true">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                      </span>
+                      <span id="comments-drawer-new-pill-text">1 new comment</span>
+                    </button>
                   </header>
 
                   <p id="comments-drawer-state" class="comments-drawer__status feed-state" hidden></p>
@@ -261,7 +270,7 @@
 
     if (mediaEl) {
       if (showMedia) {
-        const username = currentTake.profile && currentTake.profile.username ? String(currentTake.profile.username) : "clashly";
+        const username = currentTake.profile && currentTake.profile.username ? String(currentTake.profile.username) : "clashe";
         mediaEl.hidden = false;
         mediaEl.innerHTML =
           imageUrls.length === 1
@@ -382,8 +391,14 @@
     syncCommentLikeButton(commentId);
   }
 
-  async function loadComments() {
+  async function loadComments(options) {
     if (!currentTakeId || !window.ClashlyComments) return;
+
+    const skipSkeleton = Boolean(options && options.skipSkeleton);
+    const threadEl = getEl("comments-drawer-thread");
+    if (!skipSkeleton && threadEl && currentComments.length === 0 && typeof window.clasheShowCommentsSkeleton === "function") {
+      window.clasheShowCommentsSkeleton(threadEl, 4);
+    }
 
     setDrawerState("", "");
     try {
@@ -400,11 +415,294 @@
       renderComments();
       setDrawerState("", "");
     } catch (error) {
+      if (threadEl && currentComments.length === 0) {
+        threadEl.innerHTML = "";
+      }
       setDrawerState(window.ClashlyUtils.reportError("Comments drawer load failed.", error, "Could not load comments."), "error");
     }
   }
 
+  function countCommentDescendants(replies) {
+    if (!Array.isArray(replies) || !replies.length) return 0;
+    let count = replies.length;
+    for (const reply of replies) {
+      count += countCommentDescendants(reply.replies);
+    }
+    return count;
+  }
+
+  function removeCommentById(items, commentId) {
+    let removedCount = 0;
+    function filterTree(list) {
+      const nextList = [];
+      for (const item of list || []) {
+        if (item.id === commentId) {
+          removedCount += 1 + countCommentDescendants(item.replies);
+        } else {
+          const nextReplies = item.replies && item.replies.length ? filterTree(item.replies) : [];
+          nextList.push({
+            ...item,
+            replies: nextReplies,
+          });
+        }
+      }
+      return nextList;
+    }
+    const nextItems = filterTree(items);
+    return { nextItems, removedCount };
+  }
+
+  function getScrollContainer() {
+    const drawer = getDrawer();
+    return drawer ? drawer.querySelector(".comments-drawer__body") : null;
+  }
+
+  function isUserScrolledDown() {
+    const bodyEl = getScrollContainer();
+    if (!bodyEl) return false;
+    return bodyEl.scrollTop > 80;
+  }
+
+  function preserveScrollDuring(fn) {
+    const bodyEl = getScrollContainer();
+    if (!bodyEl) {
+      fn();
+      return;
+    }
+    const prevScrollTop = bodyEl.scrollTop;
+    const prevScrollHeight = bodyEl.scrollHeight;
+    fn();
+    if (prevScrollTop > 20) {
+      const heightDelta = bodyEl.scrollHeight - prevScrollHeight;
+      if (heightDelta !== 0) {
+        bodyEl.scrollTop = prevScrollTop + heightDelta;
+      }
+    }
+  }
+
+  function updateNewCommentPill() {
+    const pill = getEl("comments-drawer-new-pill");
+    const text = getEl("comments-drawer-new-pill-text");
+    if (!pill || !text) return;
+    if (unreadNewCommentsCount > 0) {
+      text.textContent = `${unreadNewCommentsCount} new ${unreadNewCommentsCount === 1 ? "comment" : "comments"}`;
+      pill.hidden = false;
+    } else {
+      pill.hidden = true;
+    }
+  }
+
+  function clearNewCommentPill() {
+    unreadNewCommentsCount = 0;
+    const pill = getEl("comments-drawer-new-pill");
+    if (pill) pill.hidden = true;
+  }
+
+  function scrollToNewComments() {
+    const bodyEl = getScrollContainer();
+    if (!bodyEl) return;
+    bodyEl.scrollTo({ top: 0, behavior: "smooth" });
+    clearNewCommentPill();
+  }
+
+  async function handleRealtimeInsert(rawRow) {
+    if (!rawRow || !rawRow.id) return;
+    if (!currentTakeId || rawRow.take_id !== currentTakeId) return;
+
+    // Deduplicate against already rendered or optimistic comment
+    if (findCommentById(currentComments, rawRow.id)) return;
+
+    let profile = null;
+    if (rawRow.user_id && window.ClashlyComments && typeof window.ClashlyComments.fetchProfilesByIds === "function") {
+      try {
+        const profileRes = await window.ClashlyComments.fetchProfilesByIds([rawRow.user_id]);
+        if (profileRes && Array.isArray(profileRes.profiles) && profileRes.profiles.length > 0) {
+          profile = profileRes.profiles[0];
+        }
+      } catch (_) {}
+    }
+
+    // Re-check take and dedupe in case state changed during profile fetch
+    if (!currentTakeId || rawRow.take_id !== currentTakeId) return;
+    if (findCommentById(currentComments, rawRow.id)) return;
+
+    const newComment = {
+      id: rawRow.id,
+      user_id: rawRow.user_id,
+      take_id: rawRow.take_id,
+      parent_id: rawRow.parent_id || null,
+      content: rawRow.content,
+      created_at: rawRow.created_at,
+      profile,
+      is_owner: Boolean(currentUserId && rawRow.user_id === currentUserId),
+      like_count: 0,
+      liked_by_me: false,
+      replies: [],
+    };
+
+    const isScrolledDown = isUserScrolledDown();
+
+    if (rawRow.parent_id) {
+      const parent = findCommentById(currentComments, rawRow.parent_id);
+      if (parent) {
+        if (!Array.isArray(parent.replies)) {
+          parent.replies = [];
+        }
+        if (currentCommentsSort === "oldest") {
+          parent.replies.push(newComment);
+        } else {
+          parent.replies.unshift(newComment);
+        }
+        if (newComment.is_owner) {
+          expandedReplyIds.add(parent.id);
+        }
+      } else {
+        if (currentCommentsSort === "oldest") {
+          currentComments.push(newComment);
+        } else {
+          currentComments.unshift(newComment);
+        }
+      }
+    } else {
+      if (currentCommentsSort === "oldest") {
+        currentComments.push(newComment);
+      } else {
+        currentComments.unshift(newComment);
+      }
+    }
+
+    currentCommentsCount++;
+    updateTotals();
+    window.dispatchEvent(
+      new CustomEvent(UPDATE_EVENT, {
+        detail: {
+          takeId: currentTakeId,
+          commentCount: currentCommentsCount,
+        },
+      })
+    );
+
+    if (currentCommentsSort === "newest" && !rawRow.parent_id && isScrolledDown && !newComment.is_owner) {
+      unreadNewCommentsCount++;
+      updateNewCommentPill();
+      preserveScrollDuring(renderComments);
+    } else {
+      if (newComment.is_owner) {
+        clearNewCommentPill();
+      }
+      preserveScrollDuring(renderComments);
+    }
+  }
+
+  function handleRealtimeUpdate(rawRow) {
+    if (!rawRow || !rawRow.id) return;
+    if (!currentTakeId || rawRow.take_id !== currentTakeId) return;
+    const existing = findCommentById(currentComments, rawRow.id);
+    if (!existing) return;
+    existing.content = rawRow.content;
+    preserveScrollDuring(renderComments);
+  }
+
+  function handleRealtimeDelete(oldRow) {
+    if (!oldRow || !oldRow.id) return;
+    const { nextItems, removedCount } = removeCommentById(currentComments, oldRow.id);
+    if (removedCount > 0) {
+      currentComments = nextItems;
+      currentCommentsCount = Math.max(0, currentCommentsCount - removedCount);
+      updateTotals();
+      window.dispatchEvent(
+        new CustomEvent(UPDATE_EVENT, {
+          detail: {
+            takeId: currentTakeId,
+            commentCount: currentCommentsCount,
+          },
+        })
+      );
+      preserveScrollDuring(renderComments);
+    }
+  }
+
+  function unsubscribeRealtimeComments() {
+    if (activeCommentsChannel) {
+      try {
+        const client = window.ClashlySupabase && typeof window.ClashlySupabase.getClient === "function"
+          ? window.ClashlySupabase.getClient()
+          : null;
+        if (client && typeof client.removeChannel === "function") {
+          client.removeChannel(activeCommentsChannel);
+        } else if (typeof activeCommentsChannel.unsubscribe === "function") {
+          activeCommentsChannel.unsubscribe();
+        }
+      } catch (err) {
+        console.warn("[Clashly] Error unsubscribing realtime comments:", err);
+      }
+      activeCommentsChannel = null;
+    }
+    activeChannelTakeId = "";
+  }
+
+  function subscribeRealtimeComments(takeId) {
+    unsubscribeRealtimeComments();
+    if (!takeId || !window.ClashlySupabase) return;
+
+    const client = window.ClashlySupabase.getClient();
+    if (!client || typeof client.channel !== "function") return;
+
+    try {
+      const channelName = `comments-take-${takeId}-${Date.now()}`;
+      activeChannelTakeId = takeId;
+      activeCommentsChannel = client
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "comments",
+            filter: `take_id=eq.${takeId}`,
+          },
+          (payload) => {
+            if (!payload || !payload.eventType) return;
+            if (payload.eventType === "INSERT") {
+              handleRealtimeInsert(payload.new);
+            } else if (payload.eventType === "UPDATE") {
+              handleRealtimeUpdate(payload.new);
+            } else if (payload.eventType === "DELETE") {
+              handleRealtimeDelete(payload.old);
+            }
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn("[Clashly] Error subscribing to realtime comments:", err);
+    }
+  }
+
+  async function loadCommentsSilently() {
+    if (!currentTakeId || !window.ClashlyComments) return;
+    try {
+      const result = await window.ClashlyComments.fetchCommentsByTake(currentTakeId, {
+        sort: currentCommentsSort,
+        currentUserId,
+      });
+      if (result.error) return;
+      currentComments = result.comments || [];
+      currentCommentsCount = result.count || 0;
+      updateTotals();
+      preserveScrollDuring(renderComments);
+    } catch (_) {}
+  }
+
   async function ensureTakeLoaded(takeId) {
+    // If the caller already handed us a full take (the common case — they
+    // tapped "comment" from a card the feed already rendered with vote
+    // counts, images, everything), skip re-fetching the exact same take
+    // from the network before the drawer can show anything. Vote/comment
+    // counts on it may be a few seconds stale, which is an acceptable
+    // trade for not making the drawer wait on a redundant round trip for
+    // data we already have in hand.
+    if (currentTake && currentTake.id === takeId) return;
+
     const result = await window.ClashlyTakes.fetchTakeById(takeId, {
       currentUserId,
     });
@@ -736,6 +1034,12 @@
   }
 
   function close() {
+    unsubscribeRealtimeComments();
+    clearNewCommentPill();
+    currentTakeId = "";
+    currentTake = null;
+    currentComments = [];
+    currentCommentsCount = 0;
     const drawer = getDrawer();
     if (!drawer) return;
     const panel = drawer.querySelector(".comments-drawer__panel");
@@ -828,6 +1132,8 @@
 
   async function open(options) {
     ensureDrawer();
+    unsubscribeRealtimeComments();
+    clearNewCommentPill();
 
     currentTakeId = options && options.takeId ? options.takeId : "";
     currentTake = options && options.take ? options.take : null;
@@ -839,8 +1145,12 @@
     expandedReplyIds = new Set();
     resetComposer();
     updateTotals();
-    setDrawerState("", "");
     openDrawerShell();
+
+    const threadEl = getEl("comments-drawer-thread");
+    if (threadEl && typeof window.clasheShowCommentsSkeleton === "function") {
+      window.clasheShowCommentsSkeleton(threadEl, 4);
+    }
 
     try {
       if (!currentUserId && window.ClashlySession) {
@@ -848,15 +1158,24 @@
         currentUserId = sessionState.user ? sessionState.user.id : "";
       }
 
-      await ensureTakeLoaded(currentTakeId);
-      renderTake();
-      await loadComments();
+      // ensureTakeLoaded resolves instantly when the caller already passed
+      // a full take (see its comment above) and only awaits the network
+      // when it genuinely has to — either way, render the take as soon as
+      // it's ready and kick off the comment fetch at the same time rather
+      // than waiting for the take render to finish first, since the two
+      // don't depend on each other.
+      const takePromise = ensureTakeLoaded(currentTakeId).then(renderTake);
+      const commentsPromise = loadComments();
+      await Promise.all([takePromise, commentsPromise]);
+
       const sortSelect = getEl("comments-drawer-sort");
       if (sortSelect) sortSelect.value = currentCommentsSort;
       updateCountLabel();
       autoSizeInput();
       syncComposerExpandedState();
       syncKeyboardOffset();
+
+      subscribeRealtimeComments(currentTakeId);
     } catch (error) {
       setDrawerState(window.ClashlyUtils.reportError("Comments drawer open failed.", error, "Could not load comments."), "error");
     }
@@ -878,6 +1197,44 @@
         close();
       }
     });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const pill = target.closest("#comments-drawer-new-pill");
+      if (pill) {
+        event.preventDefault();
+        scrollToNewComments();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const trigger = target.closest("[data-action='comments']");
+      if (!trigger) return;
+
+      if (event.defaultPrevented) return;
+
+      const takeId = trigger.getAttribute("data-take-id");
+      if (!takeId) return;
+
+      event.preventDefault();
+      open({ takeId });
+    });
+
+    document.addEventListener(
+      "scroll",
+      (event) => {
+        const target = event.target;
+        if (target instanceof HTMLElement && target.classList.contains("comments-drawer__body")) {
+          if (target.scrollTop < 30 && unreadNewCommentsCount > 0) {
+            clearNewCommentPill();
+          }
+        }
+      },
+      { passive: true, capture: true }
+    );
 
     document.addEventListener("pointerdown", (event) => {
       const target = event.target;
@@ -912,6 +1269,7 @@
     document.addEventListener("change", async (event) => {
       const target = event.target;
       if (!(target instanceof HTMLSelectElement) || target.id !== "comments-drawer-sort") return;
+      clearNewCommentPill();
       currentCommentsSort = target.value === "oldest" ? "oldest" : "newest";
       await loadComments();
     });
@@ -977,6 +1335,16 @@
       window.visualViewport.addEventListener("resize", handleViewportChange);
       window.visualViewport.addEventListener("scroll", handleViewportChange);
     }
+
+    window.addEventListener("online", () => {
+      const drawer = getDrawer();
+      if (drawer && !drawer.hidden && currentTakeId) {
+        loadCommentsSilently();
+        if (!activeCommentsChannel) {
+          subscribeRealtimeComments(currentTakeId);
+        }
+      }
+    });
   }
 
   function boot() {

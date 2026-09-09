@@ -358,8 +358,7 @@
           source: payload.status,
           result: payload.result,
         });
-        const verdict = payload.result && payload.result.verdict ? String(payload.result.verdict) : "";
-        setTakeState(verdict ? `AI Judge: ${verdict}` : "AI Judge analysis is ready.", "success");
+        setTakeState("", "");
         return;
       }
 
@@ -533,8 +532,14 @@
     syncCommentLikeButton(commentId);
   }
 
-  async function loadComments() {
+  async function loadComments(options) {
     if (!currentTake || !window.ClashlyComments) return;
+
+    const skipSkeleton = Boolean(options && options.skipSkeleton);
+    const threadEl = document.getElementById("comments-thread");
+    if (!skipSkeleton && threadEl && currentComments.length === 0 && typeof window.clasheShowCommentsSkeleton === "function") {
+      window.clasheShowCommentsSkeleton("comments-thread", 4);
+    }
 
     setCommentsState("", "");
     try {
@@ -553,6 +558,9 @@
       renderComments();
       setCommentsState("", "");
     } catch (error) {
+      if (threadEl && currentComments.length === 0) {
+        threadEl.innerHTML = "";
+      }
       setCommentsState(window.ClashlyUtils.reportError("Take comments load failed.", error, "Could not load comments."), "error");
     }
   }
@@ -994,10 +1002,14 @@
         return;
       }
 
-      // Show take skeleton immediately — before any network calls
+      // Show take & comment skeletons immediately — before any network calls
       const streamEl = document.getElementById("take-detail-stream");
       if (streamEl && typeof window.clasheShowFeedSkeleton === "function") {
         window.clasheShowFeedSkeleton("take-detail-stream", 1);
+      }
+      const threadEl = document.getElementById("comments-thread");
+      if (threadEl && typeof window.clasheShowCommentsSkeleton === "function") {
+        window.clasheShowCommentsSkeleton("comments-thread", 4);
       }
 
       if (!isSearchEntry) {

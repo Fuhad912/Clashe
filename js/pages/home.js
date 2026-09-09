@@ -1,5 +1,11 @@
 (function () {
   const PAGE_SIZE = 15;
+  // Requested candidate-window size per DB round trip when refilling the
+  // "for-you" ranking pool. The underlying service clamps this to its own
+  // max page size (30 as of this writing) — the pool-refill loop below just
+  // makes multiple requests to build up a wider window than one page when it
+  // needs to, so this constant is a request hint, not a guarantee.
+  const RANKING_WINDOW_SIZE = 90;
   const SCROLL_THRESHOLD_PX = 900;
   const AI_JUDGE_MIN_VOTES = 20;
   const AI_JUDGE_MIN_COMMENTS = 6;
@@ -14,6 +20,14 @@
       loaded: false,
       loading: false,
       meta: null,
+      // Ranked-but-not-yet-shown candidates. "for-you" pages are sliced off
+      // the front of this pool instead of being fetched one DB page at a
+      // time, so ranking can pull from a much wider window than one strict
+      // chronological page (see loadForYouFeed below).
+      pool: [],
+      poolCursor: null,
+      poolExhausted: false,
+      latestForYouMeta: null,
     },
     following: {
       takes: [],
@@ -116,6 +130,12 @@
     state.loaded = false;
     state.loading = false;
     state.meta = null;
+    if (section === "for-you") {
+      state.pool = [];
+      state.poolCursor = null;
+      state.poolExhausted = false;
+      state.latestForYouMeta = null;
+    }
   }
 
   function updateHeader() {
@@ -252,6 +272,55 @@
     window.ClashlyTakeRenderer.syncTakeState(feedEl, targetTake);
   }
 
+  // Refills state.pool from the DB (a wide, mostly-recent candidate window,
+  // ranked via personalization) whenever it's running low, then slices one
+  // PAGE_SIZE page off the front of the pool for display. This is what lets
+  // "for-you" surface a still-hot post from a batch further back instead of
+  // only ever reordering whichever single page happened to be newest.
+  async function loadForYouPage(state) {
+    const needed = PAGE_SIZE;
+
+    while (state.pool.length < needed && !state.poolExhausted) {
+      const rawResult = await window.ClashlyTakes.fetchFeedTakes({
+        tab: "new",
+        limit: RANKING_WINDOW_SIZE,
+        currentUserId,
+        cursor: state.poolCursor,
+      });
+
+      if (rawResult.error) throw rawResult.error;
+
+      const rawBatch = rawResult.takes || [];
+      state.poolCursor = rawResult.nextCursor || null;
+      if (!rawResult.hasMore || !state.poolCursor) {
+        state.poolExhausted = true;
+      }
+
+      if (!rawBatch.length) {
+        // Nothing new came back this round; stop looping if there's also
+        // nothing left to fetch, otherwise try once more for the next batch.
+        if (state.poolExhausted) break;
+        continue;
+      }
+
+      const alreadyShownIds = new Set(state.takes.map((take) => take.id));
+      const alreadyPooledIds = new Set(state.pool.map((take) => take.id));
+      const freshCandidates = rawBatch.filter(
+        (take) => !alreadyShownIds.has(take.id) && !alreadyPooledIds.has(take.id)
+      );
+
+      const ranked = await rankForYouFeed(freshCandidates);
+      state.pool = state.pool.concat(ranked.takes || []);
+      state.latestForYouMeta = ranked.meta || state.latestForYouMeta || null;
+    }
+
+    const page = state.pool.splice(0, needed);
+    state.takes = state.takes.concat(page);
+    state.hasMore = state.pool.length > 0 || !state.poolExhausted;
+    state.meta = state.latestForYouMeta || null;
+    return { page, meta: state.meta };
+  }
+
   async function loadFeed(options) {
     const feedEl = document.getElementById("feed-stream");
     if (!feedEl) return;
@@ -268,6 +337,11 @@
       state.cursor = null;
       state.hasMore = true;
       state.meta = null;
+      if (activeSection === "for-you") {
+        state.pool = [];
+        state.poolCursor = null;
+        state.poolExhausted = false;
+      }
       setFeedState("", "");
       // Show skeleton immediately — hides blank screen while DB responds
       if (!skipSkeleton) {
@@ -295,34 +369,78 @@
         state.hasMore = Boolean(feedResult.hasMore);
         state.meta = feedResult.meta || null;
         state.loaded = true;
-        renderCurrentFeed();
+
+        if (append) {
+          window.ClashlyTakeRenderer.appendTakeList(feedEl, incoming, {
+            currentUserId,
+            showAiJudgeAction: true,
+          });
+          window.ClashlyTakeRenderer.bindShareActions(feedEl, {
+            onStatus: setFeedState,
+            onShare: handleShareOpen,
+          });
+          window.ClashlyTakeRenderer.bindVoteActions(feedEl, {
+            onStatus: setFeedState,
+            onVote: handleVote,
+          });
+          window.ClashlyTakeRenderer.bindBookmarkActions(feedEl, {
+            onStatus: setFeedState,
+            onBookmark: handleBookmark,
+          });
+          window.ClashlyTakeRenderer.bindCommentActions(feedEl, {
+            onComments: handleCommentsOpen,
+          });
+          window.ClashlyTakeRenderer.bindAiJudgeActions(feedEl, {
+            onStatus: setFeedState,
+            onAiJudge: handleAiJudge,
+          });
+        } else {
+          renderCurrentFeed();
+        }
         setFeedState("", "");
         return;
       }
 
-      const feedResult = await window.ClashlyTakes.fetchFeedTakes({
-        tab: "new",
-        limit: PAGE_SIZE,
-        currentUserId,
-        cursor: append ? state.cursor : null,
-      });
-
-      if (feedResult.error) throw feedResult.error;
-
-      const ranked = await rankForYouFeed(feedResult.takes || []);
-      const incoming = ranked.takes || [];
-      state.takes = append ? state.takes.concat(incoming) : incoming;
-      state.cursor = feedResult.nextCursor || null;
-      state.hasMore = Boolean(feedResult.hasMore);
-      state.meta = ranked.meta || null;
+      // "for-you" pages come off a ranked pool rather than a single DB page —
+      // see loadForYouPage for why (wider candidate window than PAGE_SIZE).
+      const forYouResult = await loadForYouPage(state);
       state.loaded = true;
 
-      renderCurrentFeed();
+      if (append) {
+        const incoming = (forYouResult && forYouResult.page) || [];
+        window.ClashlyTakeRenderer.appendTakeList(feedEl, incoming, {
+          currentUserId,
+          showAiJudgeAction: true,
+        });
+        window.ClashlyTakeRenderer.bindShareActions(feedEl, {
+          onStatus: setFeedState,
+          onShare: handleShareOpen,
+        });
+        window.ClashlyTakeRenderer.bindVoteActions(feedEl, {
+          onStatus: setFeedState,
+          onVote: handleVote,
+        });
+        window.ClashlyTakeRenderer.bindBookmarkActions(feedEl, {
+          onStatus: setFeedState,
+          onBookmark: handleBookmark,
+        });
+        window.ClashlyTakeRenderer.bindCommentActions(feedEl, {
+          onComments: handleCommentsOpen,
+        });
+        window.ClashlyTakeRenderer.bindAiJudgeActions(feedEl, {
+          onStatus: setFeedState,
+          onAiJudge: handleAiJudge,
+        });
+      } else {
+        renderCurrentFeed();
+      }
+
       if (!state.takes.length) {
-        setFeedState(getForYouEmptyMessage(ranked.meta), "");
+        setFeedState(getForYouEmptyMessage(forYouResult && forYouResult.meta), "");
         return;
       }
       setFeedState("", "");
+      saveCurrentHomeState();
     } catch (error) {
       setFeedState(window.ClashlyUtils.reportError("Home feed load failed.", error, "Could not load feed."), "error");
     } finally {
@@ -650,6 +768,25 @@
     });
   }
 
+  let feedSentinelObserver = null;
+
+  function ensureFeedSentinel() {
+    let sentinel = document.getElementById("feed-scroll-sentinel");
+    if (sentinel) return sentinel;
+
+    sentinel = document.createElement("div");
+    sentinel.id = "feed-scroll-sentinel";
+    sentinel.className = "feed-scroll-sentinel";
+    sentinel.setAttribute("aria-hidden", "true");
+    sentinel.style.cssText = "height: 1px; width: 100%; pointer-events: none; margin: 0; padding: 0;";
+
+    const feedColumn = document.querySelector(".feed-column");
+    if (feedColumn) {
+      feedColumn.appendChild(sentinel);
+    }
+    return sentinel;
+  }
+
   function shouldLoadMore() {
     const state = getSectionState(activeSection);
     if (!state.loaded || state.loading || !state.hasMore) return false;
@@ -659,6 +796,32 @@
   }
 
   function bindInfiniteScroll() {
+    const sentinel = ensureFeedSentinel();
+    if (typeof IntersectionObserver !== "undefined" && sentinel) {
+      if (feedSentinelObserver) {
+        feedSentinelObserver.disconnect();
+      }
+
+      feedSentinelObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (!entry || !entry.isIntersecting) return;
+          const state = getSectionState(activeSection);
+          if (!state.loaded || state.loading || !state.hasMore) return;
+          loadFeed({ append: true });
+        },
+        {
+          root: null,
+          rootMargin: "900px 0px 900px 0px",
+          threshold: 0,
+        }
+      );
+
+      feedSentinelObserver.observe(sentinel);
+      return;
+    }
+
+    // Fallback if IntersectionObserver is unavailable
     window.addEventListener(
       "scroll",
       () => {
@@ -674,33 +837,144 @@
     );
   }
 
+  function saveCurrentHomeState() {
+    if (!window.ClasheCache) return;
+    const state = getSectionState(activeSection);
+    if (!state || !Array.isArray(state.takes) || !state.takes.length) return;
+    window.ClasheCache.savePageState("home", {
+      section: activeSection,
+      takes: state.takes,
+      hasMore: state.hasMore,
+      cursor: state.cursor,
+    });
+  }
+
+  async function silentRevalidateFeed() {
+    try {
+      const state = getSectionState(activeSection);
+      if (activeSection === "for-you") {
+        const freshResult = await window.ClashlyTakes.fetchFeedTakes({
+          tab: "new",
+          limit: PAGE_SIZE,
+          currentUserId,
+        });
+        if (freshResult && Array.isArray(freshResult.takes) && freshResult.takes.length > 0) {
+          const existingIds = new Set(state.takes.map((t) => t.id));
+          const newTakes = freshResult.takes.filter((t) => !existingIds.has(t.id));
+          if (newTakes.length > 0) {
+            const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+            if (currentScrollY < 60) {
+              state.takes = [...newTakes, ...state.takes];
+              renderCurrentFeed();
+            }
+          }
+          saveCurrentHomeState();
+        }
+      }
+    } catch (_err) {}
+  }
+
+  function handleTakeCreated(event) {
+    const newTake = event && event.detail && event.detail.take;
+    if (!newTake) return;
+    const state = getSectionState(activeSection);
+    if (!state.takes.some((t) => t.id === newTake.id)) {
+      state.takes.unshift(newTake);
+    }
+    renderCurrentFeed();
+    saveCurrentHomeState();
+  }
+
+  function handleTakeUpdated(event) {
+    const updatedTake = event && event.detail && event.detail.take;
+    if (!updatedTake || !updatedTake.id) return;
+    updateTakeInAllSections(updatedTake.id, () => updatedTake);
+    syncActiveTakeState(updatedTake.id);
+    saveCurrentHomeState();
+  }
+
+  function handleTakeBookmarkUpdated(event) {
+    const detail = event && event.detail;
+    if (!detail || !detail.takeId) return;
+    updateTakeInAllSections(detail.takeId, (take) => ({
+      ...take,
+      bookmarked: Boolean(detail.bookmarked),
+    }));
+    syncActiveTakeState(detail.takeId);
+    saveCurrentHomeState();
+  }
+
   async function initFeedPage() {
     try {
       if (!window.ClashlyTakes || !window.ClashlyTakeRenderer || !window.ClashlySession) return;
 
       activeSection = getHashSection();
 
-      // Show skeleton immediately — before session round-trip — so users see content structure instantly
-      const feedEl = document.getElementById("feed-stream");
-      if (feedEl && typeof window.clasheShowFeedSkeleton === "function") {
-        window.clasheShowFeedSkeleton("feed-stream", 5);
-      }
-
       bindHomeSwitch();
       bindInfiniteScroll();
       bindAiJudgeReasonModal();
-      setActiveSection(activeSection);
 
-      if (window.ClashlyApp && window.ClashlyApp.createEventName) {
-        window.addEventListener(window.ClashlyApp.createEventName, handleTakeCreated);
-      }
+      const createEvent = (window.ClashlyApp && window.ClashlyApp.createEventName) || "clashly:take-created";
+      window.addEventListener(createEvent, handleTakeCreated);
       window.addEventListener("clashly:take-updated", handleTakeUpdated);
       window.addEventListener("clashly:take-bookmark-updated", handleTakeBookmarkUpdated);
       window.addEventListener("hashchange", handleHashChange);
 
-      const sessionState = await window.ClashlySession.resolveSession();
-      currentUserId = sessionState.user ? sessionState.user.id : "";
-      await loadFeed({ append: false, skipSkeleton: true });
+      // Save scroll and feed state before navigating away
+      window.addEventListener("pagehide", () => {
+        if (window.ClasheCache) {
+          saveCurrentHomeState();
+          window.ClasheCache.saveScroll("home");
+        }
+      });
+      window.addEventListener("beforeunload", () => {
+        if (window.ClasheCache) {
+          saveCurrentHomeState();
+          window.ClasheCache.saveScroll("home");
+        }
+      });
+
+      // Check cache for instant SWR hydration
+      const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState("home") : null;
+      const cachedData = cachedRecord && cachedRecord.data;
+
+      if (cachedData && Array.isArray(cachedData.takes) && cachedData.takes.length > 0) {
+        if (cachedData.section) {
+          activeSection = cachedData.section;
+        }
+        const state = getSectionState(activeSection);
+        state.takes = cachedData.takes;
+        state.hasMore = cachedData.hasMore !== false;
+        state.cursor = cachedData.cursor || null;
+        state.loaded = true;
+
+        setActiveSection(activeSection);
+        renderCurrentFeed();
+        setFeedState("", "");
+
+        // Restore exact scroll position immediately
+        if (typeof cachedRecord.scroll === "number" && cachedRecord.scroll > 0) {
+          window.ClasheCache.restoreScroll("home");
+        }
+
+        // Silent background session check & feed revalidation
+        window.ClashlySession.resolveSession().then((sessionState) => {
+          currentUserId = sessionState.user ? sessionState.user.id : "";
+          silentRevalidateFeed();
+        }).catch(() => {});
+      } else {
+        // Cold first load: show skeleton and fetch
+        setActiveSection(activeSection);
+        const feedEl = document.getElementById("feed-stream");
+        if (feedEl && typeof window.clasheShowFeedSkeleton === "function") {
+          window.clasheShowFeedSkeleton("feed-stream", 5);
+        }
+
+        const sessionState = await window.ClashlySession.resolveSession();
+        currentUserId = sessionState.user ? sessionState.user.id : "";
+        await loadFeed({ append: false, skipSkeleton: true });
+        saveCurrentHomeState();
+      }
     } finally {
       if (window.ClasheLoader) {
         window.ClasheLoader.release("page-data");
@@ -708,5 +982,32 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", initFeedPage);
+  function tryFastSyncHydrate() {
+    const feedEl = document.getElementById("feed-stream");
+    if (!feedEl || !window.ClasheCache || !window.ClashlyTakeRenderer) return;
+    const cachedRecord = window.ClasheCache.getPageState("home");
+    const cachedData = cachedRecord && cachedRecord.data;
+    if (cachedData && Array.isArray(cachedData.takes) && cachedData.takes.length > 0) {
+      if (cachedData.section) {
+        activeSection = cachedData.section;
+      }
+      const state = getSectionState(activeSection);
+      state.takes = cachedData.takes;
+      state.hasMore = cachedData.hasMore !== false;
+      state.cursor = cachedData.cursor || null;
+      state.loaded = true;
+      renderCurrentFeed();
+      if (typeof cachedRecord.scroll === "number" && cachedRecord.scroll > 0) {
+        window.ClasheCache.restoreScroll("home");
+      }
+    }
+  }
+
+  tryFastSyncHydrate();
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initFeedPage);
+  } else {
+    initFeedPage();
+  }
 })();

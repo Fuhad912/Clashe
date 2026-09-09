@@ -45,14 +45,33 @@
         <div class="composer-layout">
           <form class="composer-form" id="take-form" novalidate>
             <div class="composer-category">
-              <label for="take-category" class="field-label">Category</label>
-              <select id="take-category" name="category" required>
-                <option value="">Loading categories...</option>
-              </select>
+              <label class="field-label" id="take-category-label">Category</label>
+              <input type="hidden" id="take-category" name="category" required value="" />
+              <button
+                type="button"
+                class="category-picker-trigger"
+                id="take-category-trigger"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-labelledby="take-category-label"
+              >
+                <span class="category-picker-trigger__content">
+                  <span class="category-picker-trigger__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M4 7h16M4 12h16M4 17h10"></path>
+                    </svg>
+                  </span>
+                  <span class="category-picker-trigger__text is-placeholder" id="take-category-trigger-text">Select a category</span>
+                </span>
+                <span class="category-picker-trigger__chevron" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m6 9 6 6 6-6"></path>
+                  </svg>
+                </span>
+              </button>
               <p class="composer-hint">Pick one lane.</p>
             </div>
 
-            <label for="take-text" class="field-label">Your take</label>
             <textarea
               id="take-text"
               class="take-textarea"
@@ -113,11 +132,14 @@
     <script src="js/auth-service.js"></script>
     <script src="js/profile-service.js"></script>
     <script src="js/notifications-service.js"></script>
+    <script src="js/email-service.js"></script>
     <script src="js/session.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/categories-service.js"></script>
+    <script src="js/category-modal.js"></script>
     <script src="js/takes-service.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/pwa-install-gate.js"></script>
     <script src="js/pages/create.js"></script>
   </body>
 </html>

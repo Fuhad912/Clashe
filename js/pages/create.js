@@ -128,17 +128,31 @@
 
     const textarea = document.getElementById("take-text");
     const countEl = document.getElementById("char-count");
-    const categorySelect = document.getElementById("take-category");
+    const categoryInput = document.getElementById("take-category");
+    const categoryTrigger = document.getElementById("take-category-trigger");
+    const categoryTriggerText = document.getElementById("take-category-trigger-text");
     const imageInput = document.getElementById("take-image");
     const preview = document.getElementById("image-preview");
     const form = document.getElementById("take-form");
     const submitBtn = document.getElementById("post-take-btn");
 
-    if (!textarea || !countEl || !categorySelect || !imageInput || !preview || !form || !submitBtn) return;
+    if (!textarea || !countEl || !categoryInput || !imageInput || !preview || !form || !submitBtn) return;
 
     const composerState = {
       selectedFiles: [],
     };
+
+    let categoryPicker = null;
+    if (window.ClasheCategoryModal && typeof window.ClasheCategoryModal.bindCategoryPicker === "function") {
+      categoryPicker = window.ClasheCategoryModal.bindCategoryPicker({
+        triggerEl: categoryTrigger,
+        inputEl: categoryInput,
+        textEl: categoryTriggerText,
+        onChange: () => setStatus("", ""),
+      });
+    } else if (categoryInput.tagName === "SELECT") {
+      await populateCategories(categoryInput);
+    }
 
     const maxChars = window.ClashlyTakes.MAX_CONTENT_LENGTH;
     updateCount(textarea, countEl, maxChars);
@@ -146,9 +160,8 @@
       setStatus("", "");
       updateCount(textarea, countEl, maxChars);
     });
-    categorySelect.addEventListener("change", () => setStatus("", ""));
+    categoryInput.addEventListener("change", () => setStatus("", ""));
     setupImagePreview(imageInput, preview, composerState);
-    await populateCategories(categorySelect);
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -161,9 +174,10 @@
         return;
       }
 
-      const categoryError = window.ClashlyTakes.validateCategory(categorySelect.value);
+      const categoryError = window.ClashlyTakes.validateCategory(categoryInput.value);
       if (categoryError) {
         setStatus(categoryError, "error");
+        if (categoryTrigger) categoryTrigger.focus();
         return;
       }
 
@@ -183,11 +197,15 @@
       submitBtn.disabled = true;
       submitBtn.textContent = "Posting...";
 
+      if (window.ClasheLoader && typeof window.ClasheLoader.show === "function") {
+        window.ClasheLoader.show("create-take");
+      }
+
       try {
         const createResult = await window.ClashlyTakes.createTake({
           userId: sessionState.user.id,
           content,
-          categorySlug: categorySelect.value,
+          categorySlug: categoryInput.value,
           imageFiles,
         });
 
@@ -196,14 +214,29 @@
         }
 
         form.reset();
+        if (categoryPicker) {
+          categoryPicker.reset();
+        }
         composerState.selectedFiles = [];
         resetPreview(preview);
         updateCount(textarea, countEl, maxChars);
-        setStatus("Take posted. Redirecting to feed...", "success");
+
+        const hasReferrer =
+          document.referrer &&
+          !document.referrer.includes("auth.html") &&
+          !document.referrer.includes("create.html");
+
         window.setTimeout(() => {
-          window.location.replace("index.html#new");
+          if (hasReferrer && window.history.length > 1) {
+            window.location.replace(document.referrer);
+          } else {
+            window.location.replace("index.html");
+          }
         }, 350);
       } catch (error) {
+        if (window.ClasheLoader && typeof window.ClasheLoader.hide === "function") {
+          window.ClasheLoader.hide("create-take");
+        }
         const message = window.ClashlyUtils.reportError("Create page post failed.", error, "Could not post take.");
         setStatus(message, "error");
       } finally {

@@ -1,8 +1,6 @@
 (function () {
   const AI_JUDGE_MIN_VOTES = 20;
   const AI_JUDGE_MIN_COMMENTS = 6;
-  const RECENT_SEARCHES_KEY_PREFIX = "clashe-recent-searches";
-  const MAX_RECENT_SEARCHES = 8;
   let currentUserId = "";
   let currentQuery = "";
   let currentTakeResults = [];
@@ -10,15 +8,6 @@
   let currentHashtagResults = [];
   let currentTrendingTopics = [];
   let expandedTakeId = "";
-
-  const EXPLORE_LANE_THEMES = [
-    { accent: "#ff6f4d", glow: "rgba(255, 111, 77, 0.18)", surface: "rgba(255, 111, 77, 0.08)" },
-    { accent: "#0ea5e9", glow: "rgba(14, 165, 233, 0.18)", surface: "rgba(14, 165, 233, 0.08)" },
-    { accent: "#16a34a", glow: "rgba(22, 163, 74, 0.18)", surface: "rgba(22, 163, 74, 0.08)" },
-    { accent: "#d97706", glow: "rgba(217, 119, 6, 0.18)", surface: "rgba(217, 119, 6, 0.08)" },
-    { accent: "#db2777", glow: "rgba(219, 39, 119, 0.18)", surface: "rgba(219, 39, 119, 0.08)" },
-    { accent: "#7c3aed", glow: "rgba(124, 58, 237, 0.18)", surface: "rgba(124, 58, 237, 0.08)" },
-  ];
 
   function getQuery() {
     const params = new URLSearchParams(window.location.search);
@@ -34,6 +23,8 @@
     return String(value || "").trim();
   }
 
+  const RECENT_SEARCHES_KEY_PREFIX = "clashe-recent-searches";
+
   function getRecentSearchesStorageKey() {
     return `${RECENT_SEARCHES_KEY_PREFIX}:${currentUserId || "guest"}`;
   }
@@ -47,7 +38,7 @@
       return parsed
         .map((item) => normalizeSearchTerm(item))
         .filter(Boolean)
-        .slice(0, MAX_RECENT_SEARCHES);
+        .slice(0, 6);
     } catch (_error) {
       return [];
     }
@@ -55,7 +46,7 @@
 
   function saveRecentSearches(items) {
     try {
-      window.localStorage.setItem(getRecentSearchesStorageKey(), JSON.stringify((items || []).slice(0, MAX_RECENT_SEARCHES)));
+      window.localStorage.setItem(getRecentSearchesStorageKey(), JSON.stringify((items || []).slice(0, 6)));
     } catch (_error) {
       // Ignore storage failures.
     }
@@ -70,49 +61,6 @@
     saveRecentSearches(deduped);
   }
 
-  function clearRecentSearches() {
-    saveRecentSearches([]);
-  }
-
-  function renderRecentSearches() {
-    const panelEl = document.getElementById("search-recents-panel");
-    const listEl = document.getElementById("search-recents-list");
-    const clearBtn = document.getElementById("search-recents-clear");
-    if (!panelEl || !listEl || !clearBtn) return;
-
-    const recentSearches = getRecentSearches();
-    const hasRecentSearches = recentSearches.length > 0;
-    panelEl.hidden = !hasRecentSearches;
-    listEl.hidden = !hasRecentSearches;
-    clearBtn.hidden = !hasRecentSearches;
-
-    if (!hasRecentSearches) {
-      listEl.innerHTML = "";
-      return;
-    }
-
-    listEl.innerHTML = recentSearches
-      .map(
-        (term) => `
-          <button
-            type="button"
-            class="search-recents__item"
-            data-recent-search="${window.ClashlyUtils.escapeHtml(term)}"
-            aria-label="Search for ${window.ClashlyUtils.escapeHtml(term)} again"
-          >
-            <span class="search-recents__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 8v4l2.8 2"></path>
-                <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
-              </svg>
-            </span>
-            <span>${window.ClashlyUtils.escapeHtml(term)}</span>
-          </button>
-        `
-      )
-      .join("");
-  }
-
   function goToSearchQuery(query) {
     const normalized = normalizeSearchTerm(query);
     const nextUrl = normalized ? `search.html?q=${encodeURIComponent(normalized)}` : "search.html";
@@ -125,15 +73,30 @@
     input.value = currentQuery;
   }
 
+  let stateTimer = null;
+
   function setState(message, type) {
     const stateEl = document.getElementById("search-state");
     if (!stateEl) return;
+
+    // Cancel any pending auto-dismiss
+    if (stateTimer) { clearTimeout(stateTimer); stateTimer = null; }
 
     stateEl.hidden = !message;
     stateEl.textContent = message || "";
     stateEl.classList.remove("is-error", "is-success");
     if (type === "error") stateEl.classList.add("is-error");
     if (type === "success") stateEl.classList.add("is-success");
+
+    // Auto-dismiss success messages after 3 seconds
+    if (type === "success" && message) {
+      stateTimer = setTimeout(() => {
+        stateEl.hidden = true;
+        stateEl.textContent = "";
+        stateEl.classList.remove("is-error", "is-success");
+        stateTimer = null;
+      }, 3000);
+    }
   }
 
   function setGroupCount(elementId, count) {
@@ -144,98 +107,6 @@
     countEl.textContent = safeCount ? safeCount.toLocaleString() : "";
   }
 
-  function findExactHashtagMatch() {
-    const safeQuery = window.ClashlySearch.normalizeHashtagQuery(currentQuery);
-    if (!safeQuery) return null;
-    return (
-      currentHashtagResults.find((hashtag) => String(hashtag && hashtag.tag || "").toLowerCase() === safeQuery) || null
-    );
-  }
-
-  function renderExactTagCta() {
-    const ctaEl = document.getElementById("search-social-cta");
-    if (!ctaEl) return;
-
-    const exactMatch = findExactHashtagMatch();
-    if (!exactMatch) {
-      ctaEl.hidden = true;
-      ctaEl.removeAttribute("href");
-      ctaEl.textContent = "";
-      return;
-    }
-
-    ctaEl.hidden = false;
-    ctaEl.href = `hashtag.html?tag=${encodeURIComponent(exactMatch.tag)}`;
-    ctaEl.innerHTML = `Jump straight to the <strong>#${window.ClashlyUtils.escapeHtml(exactMatch.tag)}</strong> feed &rarr;`;
-  }
-
-  function renderResultsSummary() {
-    const summaryEl = document.getElementById("search-social-summary");
-    const queryEl = document.getElementById("search-social-query");
-    const lineEl = document.getElementById("search-social-line");
-    const titleEl = summaryEl ? summaryEl.querySelector(".search-social-summary__title") : null;
-    const statsEl = document.getElementById("search-social-stats");
-    if (!summaryEl || !queryEl || !lineEl || !statsEl) return;
-
-    if (!currentQuery) {
-      summaryEl.hidden = true;
-      queryEl.textContent = "";
-      lineEl.textContent = "";
-      statsEl.innerHTML = "";
-      renderExactTagCta();
-      return;
-    }
-
-    const takesCount = currentTakeResults.length;
-    const usersCount = currentUserResults.length;
-    const hashtagsCount = currentHashtagResults.length;
-    const totalCount = takesCount + usersCount + hashtagsCount;
-
-    summaryEl.hidden = false;
-    queryEl.textContent = `"${currentQuery}"`;
-    if (titleEl) {
-      titleEl.textContent =
-        usersCount && takesCount
-          ? "People and takes are moving around this search"
-          : usersCount
-            ? "Profiles are surfacing around this search"
-            : takesCount
-              ? "The feed is carrying this search"
-              : hashtagsCount
-                ? "Tags are clustering around this search"
-                : "Nothing is moving around this search yet";
-    }
-    lineEl.textContent =
-      usersCount && takesCount
-        ? `${usersCount} ${usersCount === 1 ? "person is" : "people are"} in the mix and ${takesCount} ${takesCount === 1 ? "take is" : "takes are"} carrying the conversation.`
-        : usersCount
-          ? `${usersCount} ${usersCount === 1 ? "profile is" : "profiles are"} standing out around this search right now.`
-          : takesCount
-            ? `${takesCount} ${takesCount === 1 ? "take is" : "takes are"} carrying the feed around this topic.`
-            : hashtagsCount
-              ? `${hashtagsCount} ${hashtagsCount === 1 ? "tag is" : "tags are"} clustering around the same conversation.`
-              : `No matching profiles, takes, or tags for "${currentQuery}" yet.`;
-
-    const statTargets = ["", "search-users-group", "search-takes-group", "search-hashtags-group"];
-    const statCounts = [totalCount, usersCount, takesCount, hashtagsCount];
-    statsEl.innerHTML = [
-      `${totalCount} ${totalCount === 1 ? "result" : "results"}`,
-      `${usersCount} ${usersCount === 1 ? "person" : "people"}`,
-      `${takesCount} ${takesCount === 1 ? "take" : "takes"}`,
-      `${hashtagsCount} ${hashtagsCount === 1 ? "tag" : "tags"}`,
-    ]
-      .map((label, index) => {
-        const target = statTargets[index];
-        const safeLabel = window.ClashlyUtils.escapeHtml(label);
-        if (target && statCounts[index] > 0) {
-          return `<a class="search-social-summary__stat search-social-summary__stat--${index + 1}" href="#${target}">${safeLabel}</a>`;
-        }
-        return `<span class="search-social-summary__stat search-social-summary__stat--${index + 1}">${safeLabel}</span>`;
-      })
-      .join("");
-
-    renderExactTagCta();
-  }
 
   async function decorateUsersWithFollowState(users) {
     const safeUsers = Array.isArray(users) ? users : [];
@@ -294,9 +165,6 @@
     const discoveryEl = document.getElementById("search-discovery");
     if (!discoveryEl) return;
     discoveryEl.hidden = !isVisible;
-    if (isVisible) {
-      renderRecentSearches();
-    }
   }
 
   function setExploreVisibility(isVisible) {
@@ -332,11 +200,13 @@
   function updateHeader() {
     const titleEl = document.getElementById("search-title");
     const subtitleEl = document.getElementById("search-subtitle");
+    const backLinkEl = document.getElementById("search-back-link");
 
     if (!currentQuery) {
       document.title = "Clashe | Search";
       if (titleEl) titleEl.textContent = "Discover";
       if (subtitleEl) subtitleEl.textContent = "Search people, takes, and tags from one social floor.";
+      if (backLinkEl) backLinkEl.hidden = true;
       syncSearchInput();
       return;
     }
@@ -344,69 +214,12 @@
     document.title = `Clashe | Search: ${currentQuery}`;
     if (titleEl) titleEl.textContent = `Searching "${currentQuery}"`;
     if (subtitleEl) subtitleEl.textContent = "People, takes, and tags moving around the same conversation.";
+    if (backLinkEl) backLinkEl.hidden = false;
     syncSearchInput();
   }
 
   function toCategoryHref(slug) {
     return `category.html?category=${encodeURIComponent(slug)}`;
-  }
-
-  function getLaneTheme(index) {
-    return EXPLORE_LANE_THEMES[index % EXPLORE_LANE_THEMES.length];
-  }
-
-  function getKeywordOrbs(keywords) {
-    return keywords
-      .slice(0, 3)
-      .map((keyword) => {
-        const label = String(keyword || "").replace(/^#/, "").trim();
-        const initials = label.slice(0, 2).toUpperCase();
-        return `<span class="search-explore-card__orb" aria-hidden="true">${window.ClashlyUtils.escapeHtml(initials || "CL")}</span>`;
-      })
-      .join("");
-  }
-
-  function summarizeLaneSignal(category, topCategorySlugs, topHashtags) {
-    const keywordList = Array.isArray(category.keywords) ? category.keywords.map((keyword) => String(keyword || "").toLowerCase()) : [];
-    const trendingMatches = currentTrendingTopics
-      .map((topic) => String(topic.tag || "").toLowerCase())
-      .filter((tag) => keywordList.includes(tag))
-      .slice(0, 2);
-    const personalMatches = keywordList.filter((keyword) => topHashtags.has(keyword)).slice(0, 2);
-    const isPreferredCategory = topCategorySlugs.has(String(category.slug || "").toLowerCase());
-
-    if (isPreferredCategory && personalMatches.length) {
-      return {
-        eyebrow: "For you",
-        note: `Because you keep circling ${personalMatches.map((tag) => `#${tag}`).join(" and ")}.`,
-      };
-    }
-
-    if (isPreferredCategory) {
-      return {
-        eyebrow: "For you",
-        note: "This lane lines up with where you have been spending attention lately.",
-      };
-    }
-
-    if (trendingMatches.length) {
-      return {
-        eyebrow: "Trending now",
-        note: `Hot around ${trendingMatches.map((tag) => `#${tag}`).join(" and ")} right now.`,
-      };
-    }
-
-    if ((category.take_count || 0) >= 12) {
-      return {
-        eyebrow: "Busy lane",
-        note: "High posting volume and fresh arguments are pushing this lane up.",
-      };
-    }
-
-    return {
-      eyebrow: "Fresh lane",
-      note: "A cleaner pocket to enter before the debate gets crowded.",
-    };
   }
 
   function scoreExploreCategory(category, signalSummary) {
@@ -473,13 +286,6 @@
       return;
     }
 
-    const topCategorySlugs = new Set(
-      ((signalSummary && signalSummary.topInterests && signalSummary.topInterests.categories) || []).map((slug) => String(slug || "").toLowerCase())
-    );
-    const topHashtags = new Set(
-      ((signalSummary && signalSummary.topInterests && signalSummary.topInterests.hashtags) || []).map((tag) => String(tag || "").toLowerCase())
-    );
-
     const ranked = categories
       .slice()
       .sort((left, right) => {
@@ -494,68 +300,20 @@
     setExploreState("", "");
     gridEl.hidden = false;
     gridEl.innerHTML = ranked
-      .map((category, index) => {
-        const theme = getLaneTheme(index);
-        const laneSignal = summarizeLaneSignal(category, topCategorySlugs, topHashtags);
-        const keywords = Array.isArray(category.keywords) ? category.keywords.slice(0, 4) : [];
-        const trendingMatches = currentTrendingTopics
-          .map((topic) => String(topic.tag || "").toLowerCase())
-          .filter((tag) => keywords.map((keyword) => String(keyword || "").toLowerCase()).includes(tag))
-          .slice(0, 2);
-        const metaTags = [
-          `${Number(category.take_count || 0)} ${Number(category.take_count || 0) === 1 ? "take" : "takes"}`,
-          ...trendingMatches.map((tag) => `#${tag}`),
-        ].slice(0, 3);
-
+      .map((category) => {
+        const takeCount = Number(category.take_count || 0);
         return `
-          <article
-            class="search-explore-card"
-            style="--lane-accent:${theme.accent};--lane-glow:${theme.glow};--lane-surface:${theme.surface};"
-          >
-            <div class="search-explore-card__wash" aria-hidden="true"></div>
-            <header class="search-explore-card__head">
-              <div class="search-explore-card__eyebrow-row">
-                <p class="search-explore-card__eyebrow">${window.ClashlyUtils.escapeHtml(laneSignal.eyebrow)}</p>
-                <span class="search-explore-card__slug">/${window.ClashlyUtils.escapeHtml(category.slug)}</span>
-              </div>
+          <article class="search-explore-card">
+            <div class="search-explore-card__head">
               <h3 class="search-explore-card__title">
                 <a href="${toCategoryHref(category.slug)}">${window.ClashlyUtils.escapeHtml(category.name)}</a>
               </h3>
-              <p class="search-explore-card__description">${window.ClashlyUtils.escapeHtml(category.description)}</p>
-            </header>
-
-            <div class="search-explore-card__social">
-              <div class="search-explore-card__orbs">${getKeywordOrbs(keywords)}</div>
-              <p class="search-explore-card__social-copy">${window.ClashlyUtils.escapeHtml(laneSignal.note)}</p>
             </div>
-
-            <div class="search-explore-card__meta">
-              ${metaTags
-                .map(
-                  (tag) => `
-                    <span class="search-explore-card__meta-pill">${window.ClashlyUtils.escapeHtml(tag)}</span>
-                  `
-                )
-                .join("")}
-            </div>
-
-            <div class="search-explore-card__chips">
-              ${keywords
-                .map(
-                  (keyword) => `
-                    <a class="search-explore-card__chip" href="search.html?q=${encodeURIComponent(keyword)}">
-                      ${window.ClashlyUtils.escapeHtml(`#${keyword}`)}
-                    </a>
-                  `
-                )
-                .join("")}
-            </div>
-
             <footer class="search-explore-card__footer">
               <span class="search-explore-card__stat">${window.ClashlyUtils.escapeHtml(
-                `${Number(category.take_count || 0)} live ${Number(category.take_count || 0) === 1 ? "post" : "posts"}`
+                `${takeCount} ${takeCount === 1 ? "take" : "takes"}`
               )}</span>
-              <a class="search-explore-card__cta" href="${toCategoryHref(category.slug)}">Enter lane</a>
+              <a class="search-explore-card__cta" href="${toCategoryHref(category.slug)}">Enter</a>
             </footer>
           </article>
         `;
@@ -786,8 +544,7 @@
       updateUserFollowState(targetUserId, !shouldUnfollow);
       renderUsers(currentUserResults);
       bindUserActions();
-      renderResultsSummary();
-      setState(shouldUnfollow ? "Profile unfollowed." : "Now following profile.", "success");
+      // Silent optimistic toggle - button updates state cleanly
 
       if (!shouldUnfollow && window.ClashlyNotifications) {
         window.ClashlyNotifications.createNotification({
@@ -798,7 +555,11 @@
         }).catch(() => {});
       }
     } catch (error) {
-      setState(window.ClashlyUtils.reportError("Search follow toggle failed.", error, "Could not update follow state."), "error");
+      if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+        window.ClashlyUtils.showToast("Could not update follow state.", "error");
+      } else {
+        setState(window.ClashlyUtils.reportError("Search follow toggle failed.", error, "Could not update follow state."), "error");
+      }
     } finally {
       button.disabled = false;
     }
@@ -834,68 +595,85 @@
     emptyEl.textContent = `No results found for "${currentQuery}".`;
   }
 
-  function renderTrendingTopics(topics) {
-    const gridEl = document.getElementById("search-trending-topics");
-    if (!gridEl) return;
+  function formatTrendingVolume(takeCount, engagementCount, score) {
+    const rawVolume = Math.max(
+      takeCount || 1,
+      Math.round((takeCount || 1) * 2 + (engagementCount || 0) * 14 + (score || 0) * 12)
+    );
 
-    if (!topics.length) {
-      gridEl.hidden = true;
-      gridEl.innerHTML = "";
-      setTrendingState("", "");
+    if (rawVolume >= 1_000_000) {
+      return `${(rawVolume / 1_000_000).toFixed(1).replace(/\.0$/, "")}M takes`;
+    }
+    if (rawVolume >= 1_000) {
+      return `${(rawVolume / 1_000).toFixed(1).replace(/\.0$/, "")}K takes`;
+    }
+    return `${rawVolume.toLocaleString()} takes`;
+  }
+
+  function renderTrendingTopics(topics) {
+    const listEl = document.getElementById("search-trending-topics");
+    if (!listEl) return;
+
+    if (!topics || !topics.length) {
+      listEl.hidden = true;
+      listEl.innerHTML = "";
+      setTrendingState("No trending topics found.", "");
       return;
     }
 
     setTrendingState("", "");
     currentTrendingTopics = topics.slice();
-    gridEl.hidden = false;
-    gridEl.innerHTML = topics
+    listEl.hidden = false;
+    listEl.innerHTML = topics
       .map((topic, index) => {
-        const latestLabel =
-          window.ClashlyUtils && typeof window.ClashlyUtils.formatRelativeTime === "function" && topic.latestAt
-            ? window.ClashlyUtils.formatRelativeTime(topic.latestAt)
-            : "";
-        const takeLabel = `${topic.takeCount} recent take${topic.takeCount === 1 ? "" : "s"}`;
-        const engagementLabel = `${topic.engagementCount} vote action${topic.engagementCount === 1 ? "" : "s"}`;
-        const freshnessCopy = latestLabel ? `Latest take ${latestLabel}` : "Recent hashtag activity";
+        const keyword = topic.keyword || topic.tag || "";
+        const safeKeyword = window.ClashlyUtils.escapeHtml(keyword);
+        const category = topic.category || "Debate";
+        const safeCategory = window.ClashlyUtils.escapeHtml(category);
+        const volumeLabel = formatTrendingVolume(topic.takeCount, topic.engagementCount, topic.score);
+        const rank = index + 1;
 
         return `
-          <a class="search-topic-card" href="hashtag.html?tag=${encodeURIComponent(topic.tag)}">
-            <div class="search-topic-card__lead">
-              <p class="search-topic-card__rank">Lane ${index + 1}</p>
-              <h3 class="search-topic-card__title">#${window.ClashlyUtils.escapeHtml(topic.tag)}</h3>
-              <p class="search-topic-card__meta">${window.ClashlyUtils.escapeHtml(freshnessCopy)}</p>
+          <div
+            class="trend-item"
+            data-search-term="${safeKeyword}"
+            role="button"
+            tabindex="0"
+            aria-label="${rank}, ${safeCategory} Trending: ${safeKeyword}, ${volumeLabel}"
+          >
+            <div class="trend-item__lead">
+              <span class="trend-item__kicker">${rank} · ${safeCategory} · Trending</span>
+              <button type="button" class="trend-item__more" aria-label="More options for ${safeKeyword}" tabindex="-1">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                  <circle cx="5" cy="12" r="2"></circle>
+                  <circle cx="12" cy="12" r="2"></circle>
+                  <circle cx="19" cy="12" r="2"></circle>
+                </svg>
+              </button>
             </div>
-            <div class="search-topic-card__stats">
-              <span class="search-topic-card__stat">
-                <strong>${topic.takeCount}</strong>
-                <span>${window.ClashlyUtils.escapeHtml(takeLabel)}</span>
-              </span>
-              <span class="search-topic-card__stat">
-                <strong>${topic.engagementCount}</strong>
-                <span>${window.ClashlyUtils.escapeHtml(engagementLabel)}</span>
-              </span>
-            </div>
-          </a>
+            <div class="trend-item__keyword">${safeKeyword}</div>
+            <div class="trend-item__stat">${volumeLabel}</div>
+          </div>
         `;
       })
       .join("");
   }
 
-  async function loadTrendingTopics() {
+  async function loadTrendingTopics(options = {}) {
     if (!window.ClashlySearch || typeof window.ClashlySearch.fetchTrendingTopics !== "function") {
       return;
     }
 
     setTrendingState("", "");
 
-    // Show a trending skeleton while we wait
-    if (typeof window.clasheShowTrendingSkeleton === "function") {
-      window.clasheShowTrendingSkeleton("search-trending-topics", 3);
+    // Show a trending skeleton only if not skipping
+    if (!options.skipSkeleton && typeof window.clasheShowTrendingSkeleton === "function") {
+      window.clasheShowTrendingSkeleton("search-trending-topics", 4);
     }
 
     try {
       const result = await window.ClashlySearch.fetchTrendingTopics({
-        limit: 6,
+        limit: 8,
         windowHours: 168,
         recentTakeLimit: 250,
       });
@@ -905,11 +683,17 @@
       }
 
       renderTrendingTopics(result.topics || []);
+      if (window.ClasheCache) {
+        window.ClasheCache.savePageState("search", {
+          trendingTopics: result.topics || [],
+          query: currentQuery,
+        });
+      }
     } catch (error) {
       const message = window.ClashlyUtils.reportError(
         "Trending topics load failed.",
         error,
-        "Could not load live lanes right now."
+        "Could not load live signals right now."
       );
       const gridEl = document.getElementById("search-trending-topics");
       if (gridEl) {
@@ -1239,7 +1023,6 @@
       renderTakes([]);
       renderUsers([]);
       renderHashtags([]);
-      renderResultsSummary();
       renderEmptyState(true);
       setState("", "");
       return;
@@ -1285,7 +1068,6 @@
       renderTakes(currentTakeResults);
       renderUsers(currentUserResults);
       renderHashtags(currentHashtagResults);
-      renderResultsSummary();
 
       const hasResults = currentTakeResults.length || currentUserResults.length || currentHashtagResults.length;
       renderEmptyState(Boolean(hasResults));
@@ -1320,23 +1102,41 @@
         });
       }
 
-      const recentsListEl = document.getElementById("search-recents-list");
-      if (recentsListEl) {
-        recentsListEl.addEventListener("click", (event) => {
+      const trendingTopicsEl = document.getElementById("search-trending-topics");
+      if (trendingTopicsEl) {
+        const handleTrendSelect = (item) => {
+          const term = item.getAttribute("data-search-term") || item.getAttribute("data-trending-tag") || "";
+          if (!term) return;
+          const input = document.getElementById("search-page-input");
+          if (input) {
+            input.value = term;
+          }
+          goToSearchQuery(term);
+        };
+
+        trendingTopicsEl.addEventListener("click", (event) => {
           const target = event.target;
           if (!(target instanceof Element)) return;
-          const trigger = target.closest("[data-recent-search]");
-          if (!trigger) return;
-          const recentSearch = trigger.getAttribute("data-recent-search") || "";
-          goToSearchQuery(recentSearch);
+          if (target.closest(".trend-item__more")) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          const item = target.closest("[data-search-term], [data-trending-tag]");
+          if (!item) return;
+          event.preventDefault();
+          handleTrendSelect(item);
         });
-      }
 
-      const clearRecentsBtn = document.getElementById("search-recents-clear");
-      if (clearRecentsBtn) {
-        clearRecentsBtn.addEventListener("click", () => {
-          clearRecentSearches();
-          renderRecentSearches();
+        trendingTopicsEl.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            const target = event.target;
+            if (!(target instanceof Element)) return;
+            const item = target.closest("[data-search-term], [data-trending-tag]");
+            if (!item) return;
+            event.preventDefault();
+            handleTrendSelect(item);
+          }
         });
       }
 
@@ -1351,13 +1151,55 @@
 
       bindUserActions();
 
+      const backLink = document.getElementById("search-back-link");
+      if (backLink) {
+        backLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          goToSearchQuery("");
+        });
+      }
+
+      window.addEventListener("popstate", loadResults);
       window.addEventListener("clashly:take-updated", handleTakeUpdated);
       window.addEventListener("clashly:take-bookmark-updated", handleTakeBookmarkUpdated);
-      renderRecentSearches();
+
+      // Save scroll and search cache before navigating away
+      window.addEventListener("pagehide", () => {
+        if (window.ClasheCache && currentTrendingTopics.length) {
+          window.ClasheCache.savePageState("search", {
+            trendingTopics: currentTrendingTopics,
+            query: currentQuery,
+          });
+          window.ClasheCache.saveScroll("search");
+        }
+      });
+      window.addEventListener("beforeunload", () => {
+        if (window.ClasheCache && currentTrendingTopics.length) {
+          window.ClasheCache.savePageState("search", {
+            trendingTopics: currentTrendingTopics,
+            query: currentQuery,
+          });
+          window.ClasheCache.saveScroll("search");
+        }
+      });
+
+      // Instant SWR hydration from cache
+      const cachedSearch = window.ClasheCache ? window.ClasheCache.getPageState("search") : null;
+      const cachedData = cachedSearch && cachedSearch.data;
+      const hasCachedTrends = Boolean(
+        cachedData && Array.isArray(cachedData.trendingTopics) && cachedData.trendingTopics.length > 0
+      );
+
+      if (hasCachedTrends) {
+        renderTrendingTopics(cachedData.trendingTopics);
+        if (typeof cachedSearch.scroll === "number" && cachedSearch.scroll > 0) {
+          window.ClasheCache.restoreScroll("search");
+        }
+      }
 
       const [sessionState] = await Promise.all([
         window.ClashlySession.resolveSession(),
-        loadTrendingTopics(),
+        loadTrendingTopics({ skipSkeleton: hasCachedTrends }),
         loadExploreLanes(),
       ]);
       currentUserId = sessionState.user ? sessionState.user.id : "";
@@ -1369,5 +1211,24 @@
     }
   }
 
-  document.addEventListener("DOMContentLoaded", initSearchPage);
+  function tryFastSyncHydrateSearch() {
+    const gridEl = document.getElementById("search-trending-topics");
+    if (!gridEl || !window.ClasheCache) return;
+    const cachedSearch = window.ClasheCache.getPageState("search");
+    const cachedData = cachedSearch && cachedSearch.data;
+    if (cachedData && Array.isArray(cachedData.trendingTopics) && cachedData.trendingTopics.length > 0) {
+      renderTrendingTopics(cachedData.trendingTopics);
+      if (typeof cachedSearch.scroll === "number" && cachedSearch.scroll > 0) {
+        window.ClasheCache.restoreScroll("search");
+      }
+    }
+  }
+
+  tryFastSyncHydrateSearch();
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initSearchPage);
+  } else {
+    initSearchPage();
+  }
 })();

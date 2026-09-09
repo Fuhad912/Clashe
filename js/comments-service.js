@@ -158,15 +158,21 @@
 
     const rows = result.data || [];
     const userIds = [...new Set(rows.map((row) => row.user_id))];
-    const profilesResult = await fetchProfilesByIds(userIds);
+    const commentIds = rows.map((row) => row.id);
+
+    // Profiles and like-state each depend only on the comment rows above —
+    // not on each other — so fetch them together instead of one after the
+    // other. This alone cuts the drawer's slowest-case network time by
+    // roughly a third, since these two round trips used to be serialized
+    // for no reason.
+    const [profilesResult, likeStateResult] = await Promise.all([
+      fetchProfilesByIds(userIds),
+      fetchCommentLikeState(commentIds, currentUserId),
+    ]);
+
     if (profilesResult.error) {
       return { comments: [], count: 0, error: profilesResult.error };
     }
-
-    const likeStateResult = await fetchCommentLikeState(
-      rows.map((row) => row.id),
-      currentUserId
-    );
     if (likeStateResult.error) {
       return { comments: [], count: 0, error: likeStateResult.error };
     }
@@ -326,6 +332,7 @@
   window.ClashlyComments = {
     COMMENTS_TABLE,
     COMMENT_LIKES_TABLE,
+    fetchProfilesByIds,
     validateCommentContent,
     fetchCommentsByTake,
     createComment,
