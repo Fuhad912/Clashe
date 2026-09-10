@@ -71,6 +71,8 @@
     rows.forEach((row) => {
       commentMap.set(row.id, {
         ...row,
+        ai_judge_cited: Boolean(row && row.ai_judge_cited),
+        ai_judge_cited_at: (row && row.ai_judge_cited_at) || null,
         profile: profileMap.get(row.user_id) || null,
         is_owner: Boolean(currentUserId && row.user_id === currentUserId),
         like_count: normalizeLikeCount(likeCountByCommentId.get(row.id)),
@@ -149,7 +151,7 @@
 
     const result = await client
       .from(COMMENTS_TABLE)
-      .select("id, user_id, take_id, parent_id, content, created_at")
+      .select("id, user_id, take_id, parent_id, content, created_at, ai_judge_cited, ai_judge_cited_at")
       .eq("take_id", takeId)
       .order("created_at", { ascending: safeSort === "oldest" });
 
@@ -457,6 +459,7 @@
     COMMENT_CITATIONS_TABLE,
     fetchProfilesByIds,
     validateCommentContent,
+    buildThread,
     fetchCommentsByTake,
     createComment,
     deleteComment,

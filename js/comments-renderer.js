@@ -35,6 +35,16 @@
 
   function renderRoleBadges(comment, options) {
     const badges = [];
+    if (comment && comment.ai_judge_cited) {
+      badges.push(
+        '<span class="comment-item__badge comment-badge--ai-pick" role="status" aria-label="Cited as top argument by AI Judge" title="Cited as top argument by AI Judge">' +
+          '<svg class="comment-badge__icon" viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">' +
+            '<path d="M8 1l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 11.8l-4.2 2.2.8-4.7L1.2 6l4.7-.7L8 1z"/>' +
+          '</svg>' +
+          '<span>AI Pick</span>' +
+        '</span>'
+      );
+    }
     if (isTakeAuthor(comment, options)) {
       badges.push('<span class="comment-item__badge comment-item__badge--author">Author</span>');
     }

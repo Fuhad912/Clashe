@@ -1008,3 +1008,46 @@ html.take-page--from-search .comments-shell {
   cursor: not-allowed;
 }
 
+
+/* ── AI Judge Cited Badge ("AI Pick") ───────────────────────── */
+
+.comment-badge--ai-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 3.5px;
+  min-height: 17px;
+  padding: 0 6px 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 35%, var(--color-border-strong));
+  box-shadow: 0 1px 5px color-mix(in srgb, var(--color-brand) 14%, transparent);
+  cursor: default;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.comment-badge--ai-pick .comment-badge__icon {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  color: var(--color-brand);
+}
+
+:root[data-theme="dark"] .comment-badge--ai-pick {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 14%, var(--color-surface-soft));
+  border-color: color-mix(in srgb, var(--color-brand) 42%, var(--color-border-strong));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-brand) 25%, transparent);
+}
+
+.comments-drawer__body .comment-item__badges .comment-badge--ai-pick {
+  min-height: 16px;
+  padding: 0 5px 0 4px;
+  font-size: 0.58rem;
+}
+
