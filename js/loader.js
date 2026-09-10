@@ -278,6 +278,10 @@
       if (el) el.classList.add("skeleton-shimmer", "skeleton-stat-block");
     });
 
+    // Tier progress
+    var tierProgress = document.getElementById("profile-tier-progress");
+    if (tierProgress) tierProgress.classList.add("skeleton-shimmer");
+
     // Action buttons
     var actions = document.querySelector(".profile-head__actions");
     if (actions) actions.classList.add("profile-head__actions--skeleton");
@@ -306,6 +310,9 @@
       var el = document.getElementById(id);
       if (el) el.classList.remove("skeleton-shimmer", "skeleton-stat-block");
     });
+
+    var tierProgress = document.getElementById("profile-tier-progress");
+    if (tierProgress) tierProgress.classList.remove("skeleton-shimmer");
 
     var actions = document.querySelector(".profile-head__actions");
     if (actions) actions.classList.remove("profile-head__actions--skeleton");

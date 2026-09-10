@@ -144,6 +144,183 @@
   text-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 38%, transparent);
 }
 
+.profile-stat--clashscore {
+  position: relative;
+}
+
+.profile-stat__number-group {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.clashscore-tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4.5px;
+  border-radius: var(--radius-pill);
+  font-size: 0.52rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  user-select: none;
+  vertical-align: middle;
+  transition: all var(--transition-fast);
+}
+
+/* Tier Themes based on variables.css tokens */
+[data-tier="rookie"] {
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-surface-soft) 85%, var(--color-border));
+  border: 1px solid var(--color-border);
+}
+
+[data-tier="debater"] {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-text) 24%, var(--color-border));
+}
+
+[data-tier="sharp"] {
+  color: var(--color-agree);
+  background: var(--color-agree-bg);
+  border: 1px solid var(--color-agree-border);
+}
+
+[data-tier="clasher"] {
+  color: var(--color-disagree);
+  background: var(--color-disagree-bg);
+  border: 1px solid var(--color-disagree-border);
+}
+
+[data-tier="legend"] {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-brand) 25%, transparent);
+}
+
+:root[data-theme="dark"] [data-tier="legend"] {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-surface-soft));
+  border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-border-strong));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 38%, transparent);
+}
+
+/* ── Profile Tier Progress Card ────────────────────────────── */
+
+.profile-tier-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 14px;
+  border-radius: var(--radius-2);
+  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-soft));
+  border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  box-shadow: var(--shadow-soft);
+  margin-top: 4px;
+}
+
+:root[data-theme="dark"] .profile-tier-progress {
+  background: color-mix(in srgb, var(--color-surface-soft) 60%, var(--color-surface));
+  border-color: var(--color-border);
+}
+
+.profile-tier-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.76rem;
+}
+
+.profile-tier-progress__tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.profile-tier-progress__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.profile-tier-progress__score-text {
+  color: var(--color-text-muted);
+  font-size: 0.74rem;
+}
+
+.profile-tier-progress__score-text strong {
+  color: var(--color-text);
+  font-weight: 750;
+}
+
+.profile-tier-progress__status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.profile-tier-progress__status.is-max-tier {
+  color: var(--color-brand);
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-tier-progress__track {
+  width: 100%;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-border) 45%, var(--color-surface-soft));
+  overflow: hidden;
+  position: relative;
+}
+
+:root[data-theme="dark"] .profile-tier-progress__track {
+  background: var(--color-surface-strong);
+}
+
+.profile-tier-progress__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width var(--transition-smooth);
+}
+
+.profile-tier-progress__fill[data-tier="rookie"] {
+  background: var(--color-border-strong);
+}
+
+.profile-tier-progress__fill[data-tier="debater"] {
+  background: var(--color-text);
+}
+
+.profile-tier-progress__fill[data-tier="sharp"] {
+  background: var(--color-agree);
+}
+
+.profile-tier-progress__fill[data-tier="clasher"] {
+  background: var(--color-disagree);
+}
+
+.profile-tier-progress__fill[data-tier="legend"] {
+  background: var(--color-brand);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-brand) 50%, transparent);
+}
+
 @media (max-width: 640px) {
   .profile-head__meta {
     gap: 3px;
@@ -156,6 +333,29 @@
   .profile-stat span {
     font-size: 0.68rem;
     line-height: 1.15;
+  }
+
+  .profile-stat__number-group {
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .clashscore-tier-badge {
+    font-size: 0.46rem;
+    padding: 0 3px;
+  }
+
+  .profile-tier-progress {
+    padding: 8px 11px;
+    gap: 5px;
+  }
+
+  .profile-tier-progress__header {
+    font-size: 0.7rem;
+  }
+
+  .profile-tier-progress__status {
+    font-size: 0.68rem;
   }
 }
 
@@ -171,6 +371,21 @@
   .profile-stat span {
     font-size: 0.62rem;
     line-height: 1.1;
+  }
+
+  .profile-tier-progress {
+    padding: 6px 8px;
+  }
+
+  .profile-tier-progress__header {
+    font-size: 0.66rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+
+  .profile-tier-progress__status {
+    align-self: flex-end;
   }
 }
 

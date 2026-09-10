@@ -152,10 +152,86 @@
     if (takesCountEl) takesCountEl.textContent = String(currentTakes.length);
     if (followersCountEl) followersCountEl.textContent = String(followStats.followersCount);
     if (followingCountEl) followingCountEl.textContent = String(followStats.followingCount);
-    if (clashscoreCountEl) clashscoreCountEl.textContent = formatWholeNumber(getDisplayedClashscore(profile, currentTakes));
+    const clashscore = getDisplayedClashscore(profile, currentTakes);
+    if (clashscoreCountEl) clashscoreCountEl.textContent = formatWholeNumber(clashscore);
     if (topArgumentsCountEl) topArgumentsCountEl.textContent = formatWholeNumber(citationCount);
     if (topArgumentsStatEl) {
       topArgumentsStatEl.classList.toggle("has-citations", citationCount > 0);
+    }
+
+    renderClashscoreTier(clashscore);
+  }
+
+  function renderClashscoreTier(score) {
+    const tiersApi = window.ClasheClashscoreTiers || window.ClashlyClashscoreTiers;
+    if (!tiersApi || typeof tiersApi.getClashscoreTier !== "function") {
+      return;
+    }
+
+    const tier = tiersApi.getClashscoreTier(score);
+    const tierKey = String(tier && tier.name ? tier.name : "rookie").toLowerCase();
+
+    // 1. Mini badge in stats row
+    const statBadge = document.getElementById("clashscore-tier-badge");
+    if (statBadge) {
+      statBadge.textContent = tier.name;
+      statBadge.dataset.tier = tierKey;
+    }
+
+    // 2. Full-width progress strip below hero
+    const progressCard = document.getElementById("profile-tier-progress");
+    const progressBadge = document.getElementById("profile-tier-progress-badge");
+    const currentScoreEl = document.getElementById("profile-tier-current-score");
+    const statusEl = document.getElementById("profile-tier-progress-status");
+    const trackEl = document.getElementById("profile-tier-progress-track");
+    const fillEl = document.getElementById("profile-tier-progress-fill");
+
+    if (progressCard) {
+      progressCard.dataset.tier = tierKey;
+    }
+
+    if (progressBadge) {
+      progressBadge.textContent = tier.name;
+      progressBadge.dataset.tier = tierKey;
+    }
+
+    if (currentScoreEl) {
+      currentScoreEl.textContent = formatWholeNumber(score);
+    }
+
+    if (statusEl) {
+      if (tier.nextTierMinScore === null) {
+        statusEl.innerHTML = `
+          <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">
+            <path d="M8 1l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 11.8l-4.2 2.2.8-4.7L1.2 6l4.7-.7L8 1z"/>
+          </svg>
+          <span>Max tier reached</span>
+        `;
+        statusEl.classList.add("is-max-tier");
+        if (trackEl) trackEl.hidden = true;
+      } else {
+        const allTiers = typeof tiersApi.getAllTiers === "function" ? tiersApi.getAllTiers() : [];
+        const nextTier = allTiers[tier.tierIndex + 1];
+        const nextTierName = nextTier ? nextTier.name : "";
+        const remaining = Math.max(0, tier.nextTierMinScore - score);
+
+        statusEl.textContent = `${formatWholeNumber(score)} / ${formatWholeNumber(tier.nextTierMinScore)} to ${nextTierName}`;
+        statusEl.title = `${formatWholeNumber(remaining)} points to ${nextTierName}`;
+        statusEl.classList.remove("is-max-tier");
+
+        if (trackEl) {
+          trackEl.hidden = false;
+          trackEl.setAttribute("aria-valuenow", String(Math.round(tier.progressToNext * 100)));
+          trackEl.setAttribute("aria-valuemin", "0");
+          trackEl.setAttribute("aria-valuemax", "100");
+          trackEl.setAttribute("aria-valuetext", `${Math.round(tier.progressToNext * 100)}% to ${nextTierName}`);
+        }
+
+        if (fillEl) {
+          fillEl.style.width = `${Math.min(100, Math.max(0, Math.round(tier.progressToNext * 100)))}%`;
+          fillEl.dataset.tier = tierKey;
+        }
+      }
     }
   }
 

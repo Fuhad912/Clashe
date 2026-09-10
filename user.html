@@ -67,14 +67,30 @@
                 <strong id="following-count">0</strong>
                 <span>Following</span>
               </button>
-              <div class="profile-stat">
-                <strong id="clashscore-count">0</strong>
+              <div class="profile-stat profile-stat--clashscore" id="profile-stat-clashscore">
+                <div class="profile-stat__number-group">
+                  <strong id="clashscore-count">0</strong>
+                  <span class="clashscore-tier-badge" id="clashscore-tier-badge" data-tier="rookie">Rookie</span>
+                </div>
                 <span>Clashscore</span>
               </div>
               <div class="profile-stat profile-stat--top-arguments" id="profile-stat-top-arguments">
                 <strong id="top-arguments-count">0</strong>
                 <span>Top Arguments</span>
               </div>
+            </div>
+          </div>
+
+          <div class="profile-tier-progress" id="profile-tier-progress" aria-label="Clashscore tier progress">
+            <div class="profile-tier-progress__header">
+              <div class="profile-tier-progress__tier">
+                <span class="profile-tier-progress__badge" id="profile-tier-progress-badge" data-tier="rookie">Rookie</span>
+                <span class="profile-tier-progress__score-text"><strong id="profile-tier-current-score">0</strong> Clashscore</span>
+              </div>
+              <span class="profile-tier-progress__status" id="profile-tier-progress-status">0 / 100 to Debater</span>
+            </div>
+            <div class="profile-tier-progress__track" id="profile-tier-progress-track" role="progressbar" aria-label="Clashscore tier progress">
+              <div class="profile-tier-progress__fill" id="profile-tier-progress-fill" style="width: 0%;"></div>
             </div>
           </div>
 
@@ -308,6 +324,7 @@
     <script src="js/share-modal.js"></script>
     <script src="js/app.js"></script>
     <script src="js/pwa-install-gate.js"></script>
+    <script src="js/clashscore-tiers.js"></script>
     <script src="js/pages/profile.js"></script>
   </body>
 </html>
