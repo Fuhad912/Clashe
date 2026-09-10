@@ -273,7 +273,7 @@
     }
 
     // Stats
-    ["takes-count", "followers-count", "following-count"].forEach(function (id) {
+    ["takes-count", "followers-count", "following-count", "clashscore-count", "top-arguments-count"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.classList.add("skeleton-shimmer", "skeleton-stat-block");
     });
@@ -302,7 +302,7 @@
       bio.classList.remove("skeleton-shimmer", "skeleton-bio-block");
     }
 
-    ["takes-count", "followers-count", "following-count"].forEach(function (id) {
+    ["takes-count", "followers-count", "following-count", "clashscore-count", "top-arguments-count"].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.classList.remove("skeleton-shimmer", "skeleton-stat-block");
     });

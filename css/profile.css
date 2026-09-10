@@ -93,7 +93,7 @@
 
 .profile-head__meta {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -128,9 +128,50 @@
   display: block;
   margin-top: 3px;
   font-size: 0.82rem;
+  line-height: 1.18;
   color: var(--color-text-muted);
   text-transform: none;
   letter-spacing: 0;
+}
+
+.profile-stat--top-arguments.has-citations strong {
+  color: var(--color-brand);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--color-brand) 28%, transparent);
+}
+
+:root[data-theme="dark"] .profile-stat--top-arguments.has-citations strong {
+  color: var(--color-brand);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 38%, transparent);
+}
+
+@media (max-width: 640px) {
+  .profile-head__meta {
+    gap: 3px;
+  }
+
+  .profile-stat strong {
+    font-size: 1.08rem;
+  }
+
+  .profile-stat span {
+    font-size: 0.68rem;
+    line-height: 1.15;
+  }
+}
+
+@media (max-width: 360px) {
+  .profile-head__meta {
+    gap: 2px;
+  }
+
+  .profile-stat strong {
+    font-size: 0.98rem;
+  }
+
+  .profile-stat span {
+    font-size: 0.62rem;
+    line-height: 1.1;
+  }
 }
 
 .profile-head__actions {

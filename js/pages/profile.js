@@ -11,6 +11,7 @@
     followersCount: 0,
     followingCount: 0,
   };
+  let citationCount = 0;
   let currentFollowListMode = "followers";
   let currentFollowListUsers = [];
   let editProfileAvatarFile = null;
@@ -130,6 +131,8 @@
     const followersCountEl = document.getElementById("followers-count");
     const followingCountEl = document.getElementById("following-count");
     const clashscoreCountEl = document.getElementById("clashscore-count");
+    const topArgumentsCountEl = document.getElementById("top-arguments-count");
+    const topArgumentsStatEl = document.getElementById("profile-stat-top-arguments");
     const username = profile && profile.username ? `@${profile.username}` : "@username";
 
     if (usernameEl) usernameEl.textContent = username;
@@ -150,6 +153,10 @@
     if (followersCountEl) followersCountEl.textContent = String(followStats.followersCount);
     if (followingCountEl) followingCountEl.textContent = String(followStats.followingCount);
     if (clashscoreCountEl) clashscoreCountEl.textContent = formatWholeNumber(getDisplayedClashscore(profile, currentTakes));
+    if (topArgumentsCountEl) topArgumentsCountEl.textContent = formatWholeNumber(citationCount);
+    if (topArgumentsStatEl) {
+      topArgumentsStatEl.classList.toggle("has-citations", citationCount > 0);
+    }
   }
 
   function renderActionButtons() {
@@ -1327,7 +1334,7 @@
       savedHasMore = true;
       savedLoading = false;
 
-      // Fire all three independent data fetches concurrently — this is the single
+      // Fire all independent data fetches concurrently — this is the single
       // biggest perceived-speed win on the profile page. None of these queries
       // depend on each other's results; they only need currentProfile + userState.
       const parallelFetches = [
@@ -1342,9 +1349,13 @@
             })
           : Promise.resolve({ takes: [], nextCursor: null, hasMore: false }),
         loadFollowState(),
+        window.ClashlyComments && typeof window.ClashlyComments.getCitationCountForUser === "function"
+          ? window.ClashlyComments.getCitationCountForUser(currentProfile.id)
+          : Promise.resolve(0),
       ];
 
-      const [takesState, savedState] = await Promise.all(parallelFetches);
+      const [takesState, savedState, followState, fetchedCitationCount] = await Promise.all(parallelFetches);
+      citationCount = typeof fetchedCitationCount === "number" ? Math.max(0, fetchedCitationCount) : 0;
 
       if (takesState.error) throw takesState.error;
       currentTakes = takesState.takes || [];
@@ -1618,6 +1629,7 @@
       savedTakes: currentSavedTakes,
       isOwnProfile,
       followStats,
+      citationCount,
       isFollowing,
     });
   }
@@ -1635,6 +1647,7 @@
       currentSavedTakes = cachedData.savedTakes || [];
       isOwnProfile = Boolean(cachedData.isOwnProfile);
       followStats = cachedData.followStats || followStats;
+      citationCount = typeof cachedData.citationCount === "number" ? cachedData.citationCount : 0;
       isFollowing = Boolean(cachedData.isFollowing);
 
       if (typeof window.clasheRemoveProfileSkeleton === "function") {
@@ -1703,6 +1716,7 @@
       currentSavedTakes = cachedData.savedTakes || [];
       isOwnProfile = Boolean(cachedData.isOwnProfile);
       followStats = cachedData.followStats || followStats;
+      citationCount = typeof cachedData.citationCount === "number" ? cachedData.citationCount : 0;
       isFollowing = Boolean(cachedData.isFollowing);
 
       if (typeof window.clasheRemoveProfileSkeleton === "function") {
