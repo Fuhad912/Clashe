@@ -1177,7 +1177,10 @@
       return;
     }
 
-    const confirmed = window.confirm("Delete this take permanently?");
+    const confirmed =
+      window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.confirmDeleteTake === "function"
+        ? await window.ClashlyTakeRenderer.confirmDeleteTake()
+        : true;
     if (!confirmed) return;
 
     updateTakeDeleteLoadingState(input.takeId, true);

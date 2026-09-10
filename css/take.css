@@ -880,3 +880,131 @@ html.take-page--from-search .comments-shell {
 #take-detail-stream .take-item__media {
   max-height: min(600px, 75vh);
 }
+
+/* ── Delete take confirmation modal ─────────────────────────── */
+
+.delete-take-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-smooth);
+}
+
+.delete-take-modal[hidden] {
+  display: none !important;
+}
+
+.delete-take-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  opacity: 0;
+  transition: opacity var(--transition-smooth);
+}
+
+:root[data-theme="dark"] .delete-take-modal__backdrop {
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.delete-take-modal__panel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(100% - 32px, 380px);
+  transform: translate(-50%, -46%) scale(0.96);
+  border: var(--line);
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
+  padding: 24px 22px 20px;
+  text-align: center;
+  transition: transform var(--transition-smooth), opacity var(--transition-smooth);
+}
+
+.delete-take-modal.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.delete-take-modal.is-open .delete-take-modal__backdrop {
+  opacity: 1;
+}
+
+.delete-take-modal.is-open .delete-take-modal__panel {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.delete-take-modal__icon-wrap {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root[data-theme="dark"] .delete-take-modal__icon-wrap {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+}
+
+.delete-take-modal__title {
+  margin: 0;
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+}
+
+.delete-take-modal__desc {
+  margin: 10px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.delete-take-modal__actions {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.delete-take-modal__btn-cancel {
+  width: 100%;
+  min-height: 42px;
+  font-weight: 600;
+  border-radius: var(--radius-2);
+}
+
+.delete-take-modal__btn-confirm {
+  width: 100%;
+  min-height: 42px;
+  font-weight: 600;
+  background: #dc2626;
+  color: #ffffff;
+  border: 1px solid #dc2626;
+  border-radius: var(--radius-2);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.delete-take-modal__btn-confirm:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
+}
+
+.delete-take-modal__btn-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

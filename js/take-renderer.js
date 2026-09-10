@@ -859,6 +859,99 @@
     });
   }
 
+  function ensureDeleteTakeModal() {
+    let modal = document.getElementById("delete-take-modal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = "delete-take-modal";
+    modal.className = "delete-take-modal";
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="delete-take-modal__backdrop" data-close-delete-take="true"></div>
+      <section class="delete-take-modal__panel" role="dialog" aria-modal="true" aria-labelledby="delete-take-title" aria-describedby="delete-take-desc">
+        <div class="delete-take-modal__icon-wrap" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+          </svg>
+        </div>
+        <h2 id="delete-take-title" class="delete-take-modal__title">Delete take?</h2>
+        <p id="delete-take-desc" class="delete-take-modal__desc">Are you sure you want to delete this take? This action cannot be undone and will permanently remove your take and all its votes and comments.</p>
+        <div class="delete-take-modal__actions">
+          <button type="button" class="btn btn--ghost delete-take-modal__btn-cancel" data-close-delete-take="true" id="delete-take-cancel-btn">Cancel</button>
+          <button type="button" class="btn delete-take-modal__btn-confirm" id="delete-take-confirm-btn">Delete</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function confirmDeleteTake(options) {
+    return new Promise((resolve) => {
+      const modal = ensureDeleteTakeModal();
+      if (!modal) {
+        resolve(false);
+        return;
+      }
+
+      const confirmBtn = modal.querySelector("#delete-take-confirm-btn");
+      const cancelBtn = modal.querySelector("#delete-take-cancel-btn");
+      const backdrop = modal.querySelector(".delete-take-modal__backdrop");
+      const titleEl = modal.querySelector("#delete-take-title");
+      const descEl = modal.querySelector("#delete-take-desc");
+
+      if (titleEl) {
+        titleEl.textContent = (options && options.title) || "Delete take?";
+      }
+
+      if (descEl) {
+        descEl.textContent =
+          (options && options.message) ||
+          "Are you sure you want to delete this take? This action cannot be undone and will permanently remove your take and all its votes and comments.";
+      }
+
+      let resolved = false;
+
+      function cleanup(confirmed) {
+        if (resolved) return;
+        resolved = true;
+        modal.classList.remove("is-open");
+        document.body.style.overflow = "";
+        document.removeEventListener("keydown", onKeyDown);
+        window.setTimeout(() => {
+          if (!modal.classList.contains("is-open")) {
+            modal.hidden = true;
+          }
+        }, 220);
+        resolve(Boolean(confirmed));
+      }
+
+      function onKeyDown(e) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          cleanup(false);
+        }
+      }
+
+      if (confirmBtn) confirmBtn.onclick = () => cleanup(true);
+      if (cancelBtn) cancelBtn.onclick = () => cleanup(false);
+      if (backdrop) backdrop.onclick = () => cleanup(false);
+      document.addEventListener("keydown", onKeyDown);
+
+      modal.hidden = false;
+      document.body.style.overflow = "hidden";
+      window.requestAnimationFrame(() => {
+        modal.classList.add("is-open");
+        if (cancelBtn) cancelBtn.focus();
+      });
+    });
+  }
+
   window.ClashlyTakeRenderer = {
     renderTakeList,
     appendTakeList,
@@ -870,6 +963,7 @@
     bindBookmarkActions,
     bindAiJudgeActions,
     bindDeleteActions,
+    confirmDeleteTake,
     applyImageAspectRatio,
     hydrateCachedImages,
   };
