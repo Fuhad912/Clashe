@@ -364,79 +364,285 @@ label {
   background: var(--color-surface-soft);
 }
 
-/* ── PWA install gate ─────────────────────────────────────────
-   Full-screen "install to continue" interstitial. Sits above the
-   bottom nav (z-index 40) and matches other full-screen modals
-   (ai-judge-reason-modal etc. sit at 120) but goes higher since this
-   should sit above literally everything else in the app. */
+/* ── ThinkRight-Style PWA Install Components ──────────────────
+   Clean, expandable, non-blocking installation cards and bars.
+   Zero intrusive full-screen blocking modals. */
 
-.pwa-install-gate {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
+.install-app-card {
+  border: var(--line);
+  border-radius: var(--radius-3);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  padding: var(--space-3);
   display: grid;
-  place-items: center;
-  padding: var(--space-4);
-  background: color-mix(in srgb, var(--color-text) 55%, transparent 45%);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  gap: 0;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
 }
 
-.pwa-install-gate[hidden] {
+.install-app-card[hidden] {
   display: none !important;
 }
 
-body.pwa-install-gate-open {
-  overflow: hidden;
-}
-
-.pwa-install-gate__panel {
-  position: relative;
-  width: min(420px, 100%);
-  display: grid;
-  gap: 18px;
-  padding: 32px 28px 28px;
-  border-radius: 28px;
-  border: var(--line);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-float);
-  text-align: center;
-}
-
-.pwa-install-gate__art {
+.install-app-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--radius-2);
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: left;
+  min-height: 48px;
+  padding: 12px 16px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: var(--shadow-soft);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-.pwa-install-gate__mark {
-  width: 64px;
-  height: 64px;
+.install-app-toggle:hover {
+  opacity: 0.92;
 }
 
-.pwa-install-gate__title {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: 1.5rem;
-  letter-spacing: -0.02em;
+.install-app-toggle:active {
+  transform: scale(0.99);
 }
 
-.pwa-install-gate__copy {
-  margin: 0;
+.install-app-toggle-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.install-app-toggle-title {
   font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--color-text-muted);
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.pwa-install-gate__actions {
+.install-app-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.24s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.install-app-panel {
   display: grid;
-  gap: 10px;
-  margin-top: 4px;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: 0;
+  transition: grid-template-rows 0.28s ease, opacity 0.2s ease, margin-top 0.2s ease;
 }
 
-.pwa-install-gate__install,
-.pwa-install-gate__dismiss {
-  width: 100%;
+.install-app-panel-inner {
+  overflow: hidden;
+  display: grid;
+  gap: 12px;
+  padding-top: 0;
+  border-top: 1px solid transparent;
+}
+
+.install-app-card.is-open .install-app-panel {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 10px;
+}
+
+.install-app-card.is-open .install-app-panel-inner {
+  padding-top: 12px;
+  border-top: var(--line);
+}
+
+.install-app-card.is-open .install-app-chevron {
+  transform: rotate(180deg);
+}
+
+.install-app-description {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.install-app-button {
+  width: fit-content;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+  padding: 8px 18px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.install-app-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.install-app-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.install-app-steps {
+  display: grid;
+  gap: 8px;
+  background: var(--color-surface-muted);
+  padding: 12px;
+  border-radius: var(--radius-2);
+  border: var(--line);
+}
+
+.install-app-steps p {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.install-app-steps strong {
+  color: var(--color-text);
+}
+
+/* ── Sleek Non-Blocking Bottom Banner for Feed/General Pages ── */
+
+.clashe-pwa-bar {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  width: min(420px, calc(100% - 24px));
+  background: var(--color-surface);
+  border: var(--line);
+  border-radius: var(--radius-3);
+  box-shadow: var(--shadow-panel);
+  padding: 10px 14px;
+  z-index: 35;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.clashe-pwa-bar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.clashe-pwa-bar[hidden] {
+  display: none !important;
+}
+
+.clashe-pwa-bar__inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clashe-pwa-bar__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.clashe-pwa-bar__text {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.clashe-pwa-bar__text strong {
+  font-size: 0.88rem;
+  color: var(--color-text);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.clashe-pwa-bar__text span {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clashe-pwa-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.clashe-pwa-bar__btn {
+  appearance: none;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  color: var(--color-brand-contrast);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.clashe-pwa-bar__btn:hover {
+  opacity: 0.9;
+}
+
+.clashe-pwa-bar__close {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+}
+
+.clashe-pwa-bar__close:hover {
+  color: var(--color-text);
+}
+
+@media (min-width: 860px) {
+  .clashe-pwa-bar {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    transform: translateY(20px);
+    width: 360px;
+  }
+  .clashe-pwa-bar.is-visible {
+    transform: translateY(0);
+  }
+}
+
+/* Obsolete modal gate cleanup — prevent any blocking */
+.pwa-install-gate,
+body.pwa-install-gate-open {
+  display: none !important;
 }
 
 /* ── Global Toast System ───────────────────────────────────── */

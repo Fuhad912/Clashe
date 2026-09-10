@@ -69,6 +69,44 @@
       </section>
 
       <section class="auth-form-shell" aria-label="Authentication form" data-anim="form">
+        <section class="install-app-card" id="installAppCard" aria-live="polite">
+          <button
+            type="button"
+            id="installAppToggle"
+            class="install-app-toggle"
+            aria-expanded="false"
+            aria-controls="installAppPanel"
+          >
+            <span class="install-app-toggle-copy">
+              <span class="install-app-toggle-title">Install Clashe App</span>
+            </span>
+            <span class="install-app-chevron" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+          </button>
+
+          <div id="installAppPanel" class="install-app-panel" role="region" aria-labelledby="installAppToggle">
+            <div class="install-app-panel-inner">
+              <p class="install-app-description">Install Clashe for a full app-like experience: launch directly from your home screen, full-screen without browser bars, and vote on takes faster whenever you return.</p>
+
+              <button
+                type="button"
+                id="authInstallBtn"
+                class="install-app-button"
+                style="display: none;"
+                aria-label="Install Clashe App"
+              >Install App</button>
+
+              <div class="install-app-steps">
+                <p><strong>Android (Chrome/Edge/Brave):</strong> Open Clashe in your browser, tap the menu icon (three dots) at the top-right, then choose <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong> and confirm <strong>Add/Install</strong>. If you see the Install button above, you can tap that directly.</p>
+                <p><strong>iPhone (Safari):</strong> Open Clashe in Safari, tap the <strong>Share</strong> icon (square with arrow), scroll and tap <strong>"Add to Home Screen"</strong>, then tap <strong>Add</strong> in the top-right corner.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <div class="auth-form-card">
           <header class="auth-form-head">
             <p class="auth-form-eyebrow">Account access</p>

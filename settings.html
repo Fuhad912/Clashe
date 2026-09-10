@@ -149,15 +149,42 @@
             <p id="settings-email-pref-status" class="status-message" hidden></p>
           </section>
 
-          <section id="settings-install-card" class="settings-card" aria-label="Install app" hidden>
-            <div class="settings-row settings-row--action">
-              <header class="settings-card__head">
-                <h2>Install Clashe</h2>
-                <p id="settings-install-copy">Install Clashe for faster access and an app-like experience.</p>
-              </header>
-              <button type="button" id="settings-install-trigger" class="settings-btn settings-btn--install">Install Clashe</button>
+          <section class="install-app-card" id="installAppCard" aria-live="polite">
+            <button
+              type="button"
+              id="installAppToggle"
+              class="install-app-toggle"
+              aria-expanded="false"
+              aria-controls="installAppPanel"
+            >
+              <span class="install-app-toggle-copy">
+                <span class="install-app-toggle-title">Install Clashe App</span>
+              </span>
+              <span class="install-app-chevron" aria-hidden="true">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </span>
+            </button>
+
+            <div id="installAppPanel" class="install-app-panel" role="region" aria-labelledby="installAppToggle">
+              <div class="install-app-panel-inner">
+                <p class="install-app-description">Install Clashe for a full app-like experience: launch directly from your home screen, full-screen without browser tabs, and vote on takes faster whenever you return.</p>
+
+                <button
+                  type="button"
+                  id="settingsInstallBtn"
+                  class="install-app-button"
+                  style="display: none;"
+                  aria-label="Install Clashe App"
+                >Install App</button>
+
+                <div class="install-app-steps">
+                  <p><strong>Android (Chrome/Edge/Brave):</strong> Open Clashe in your browser, tap the menu icon (three dots) at the top-right, then choose <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong> and confirm <strong>Add/Install</strong>. If you see the Install button above, you can tap that directly.</p>
+                  <p><strong>iPhone (Safari):</strong> Open Clashe in Safari, tap the <strong>Share</strong> icon (square with arrow), scroll and tap <strong>"Add to Home Screen"</strong>, then tap <strong>Add</strong> in the top-right corner.</p>
+                </div>
+              </div>
             </div>
-            <p id="settings-install-status" class="status-message" hidden></p>
           </section>
 
           <section class="settings-card" aria-label="Account actions">

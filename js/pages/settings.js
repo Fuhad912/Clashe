@@ -53,141 +53,74 @@
     if (type === "success") statusEl.classList.add("is-success");
   }
 
-  function getInstallElements() {
-    return {
-      card: document.getElementById("settings-install-card"),
-      copy: document.getElementById("settings-install-copy"),
-      trigger: document.getElementById("settings-install-trigger"),
-      status: document.getElementById("settings-install-status"),
-    };
-  }
+  function setupInstallAppCard() {
+    const installCard = document.getElementById("installAppCard");
+    const installToggle = document.getElementById("installAppToggle");
+    const installBtn = document.getElementById("settingsInstallBtn");
 
-  function isIosLikeDevice() {
-    const ua = window.navigator.userAgent || "";
-    const platform = window.navigator.platform || "";
-    return /iphone|ipad|ipod/i.test(ua) || (platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
-  }
+    if (!installCard || !installToggle) return;
 
-  function renderInstallState(state) {
-    const { card, copy, trigger } = getInstallElements();
-    if (!card || !copy || !trigger) return;
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
+      window.navigator.standalone === true;
 
-    const safeState = state || {};
-    const isInstalled = Boolean(safeState.installed);
-    const canInstall = Boolean(safeState.canInstall);
-    const promptOutcome = String(safeState.promptOutcome || "");
-    const secureContext = safeState.secureContext !== false;
-    const serviceWorkerReady = safeState.serviceWorkerReady !== false;
-    const promptCaptured = Boolean(safeState.promptCaptured);
-    const iosLike = isIosLikeDevice();
-
-    if (isInstalled) {
-      card.hidden = false;
-      copy.textContent = "Clashe is already installed on this device.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("Installed.", "success");
+    if (isStandalone) {
+      installCard.hidden = true;
       return;
     }
 
-    if (canInstall) {
-      card.hidden = false;
-      copy.textContent = "Install Clashe for faster access and an app-like experience.";
-      trigger.hidden = false;
-      trigger.disabled = false;
-      trigger.textContent = "Install Clashe";
-      setInstallStatus("", "");
-      return;
-    }
+    installToggle.addEventListener("click", () => {
+      const isOpen = installCard.classList.toggle("is-open");
+      installToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
 
-    if (!secureContext) {
-      card.hidden = false;
-      copy.textContent = "Install is unavailable because this page is not running on HTTPS or localhost.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("Use HTTPS or localhost to enable install.", "error");
-      return;
-    }
+    let deferredPrompt = window.__pwaInstallPrompt || null;
 
-    if (iosLike) {
-      card.hidden = false;
-      copy.textContent = "On iPhone or iPad, install Clashe from Safari using Share, then Add to Home Screen.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("Manual install is required on iOS.", "");
-      return;
-    }
-
-    if (!serviceWorkerReady) {
-      card.hidden = false;
-      copy.textContent = "Clashe is preparing install support for this browser.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("If you just opened Clashe for the first time, reload once after a moment.", "");
-      return;
-    }
-
-    if (!promptCaptured) {
-      card.hidden = false;
-      copy.textContent =
-        "This browser has not exposed the install prompt yet. Open Clashe in Chrome or Edge over HTTPS or localhost, visit the home page once, then reload Settings.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("No install prompt has been captured from the browser yet.", "");
-      return;
-    }
-
-    if (promptOutcome === "accepted") {
-      card.hidden = false;
-      copy.textContent = "Install accepted. Finishing setup on this device.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("Waiting for install confirmation...", "success");
-      return;
-    }
-
-    if (promptOutcome === "dismissed") {
-      card.hidden = false;
-      copy.textContent = "Install prompt dismissed for now. It will show again when the browser offers it again.";
-      trigger.hidden = true;
-      trigger.disabled = true;
-      setInstallStatus("", "");
-      return;
-    }
-
-    card.hidden = false;
-    copy.textContent =
-      "Install will appear here when this browser makes Clashe eligible. If this is your first visit, wait a moment and reload once. In Chrome or Edge, you can also check the browser menu for Install app.";
-    trigger.hidden = true;
-    trigger.disabled = true;
-    setInstallStatus("", "");
-  }
-
-  async function handleInstallClick() {
-    if (!window.ClashlyPWA) return;
-
-    const { trigger } = getInstallElements();
-    if (!(trigger instanceof HTMLButtonElement)) return;
-
-    trigger.disabled = true;
-    trigger.textContent = "Opening...";
-    setInstallStatus("", "");
-
-    try {
-      const result = await window.ClashlyPWA.promptInstall();
-
-      if (result && result.outcome === "accepted") {
-        setInstallStatus("Install accepted. Finishing setup...", "success");
-      } else if (result && result.outcome === "dismissed") {
-        setInstallStatus("Install dismissed for now.", "");
-      } else if (result && result.status === "unavailable") {
-        setInstallStatus("Install is not available on this device right now.", "error");
+    function revealInstallBtn() {
+      if (installBtn && deferredPrompt) {
+        installBtn.style.display = "inline-flex";
       }
-    } catch (error) {
-      setInstallStatus("Could not open the install prompt.", "error");
-      window.ClashlyUtils.reportError("PWA install prompt failed.", error, "Could not open install prompt.");
-    } finally {
-      renderInstallState(window.ClashlyPWA.getState());
+    }
+
+    if (deferredPrompt) {
+      revealInstallBtn();
+    }
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      window.__pwaInstallPrompt = e;
+      revealInstallBtn();
+    });
+
+    window.addEventListener("clashly:install-prompt-ready", (e) => {
+      if (e && e.detail) {
+        deferredPrompt = e.detail;
+        revealInstallBtn();
+      }
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener("click", async () => {
+        if (!deferredPrompt && window.ClashlyPWA) {
+          try {
+            await window.ClashlyPWA.promptInstall();
+          } catch (_e) {}
+          return;
+        }
+        if (!deferredPrompt) return;
+        try {
+          await deferredPrompt.prompt();
+          const choice = await deferredPrompt.userChoice;
+          if (choice && choice.outcome === "accepted") {
+            installBtn.style.display = "none";
+            installCard.hidden = true;
+          }
+        } catch (_err) {}
+        deferredPrompt = null;
+      });
     }
   }
 
@@ -462,20 +395,7 @@
         emailForm.addEventListener("submit", handleEmailChangeSubmit);
       }
 
-      const { trigger } = getInstallElements();
-      if (trigger && window.ClashlyPWA) {
-        trigger.addEventListener("click", () => {
-          handleInstallClick().catch(() => {});
-        });
-        unsubscribePwaState = window.ClashlyPWA.subscribe(renderInstallState);
-      } else {
-        renderInstallState({
-          installed: false,
-          canInstall: false,
-          promptOutcome: "",
-          promptCaptured: false,
-        });
-      }
+      setupInstallAppCard();
 
       const deleteBtn = document.getElementById("settings-delete-account");
       if (deleteBtn) {

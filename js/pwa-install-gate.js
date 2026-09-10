@@ -1,23 +1,15 @@
-// pwa-install-gate.js — full-screen "install to continue" interstitial.
+// pwa-install-gate.js — ThinkRight-style smooth PWA install handler.
+// Zero blocking modals. Zero viewport locks.
 //
-// Real web platforms give no API to force a PWA install; the browser alone
-// decides whether/when an install button can even appear. What this module
-// does instead is the closest honest equivalent: show a full-screen prompt
-// on a cooldown, on every gated page, until the person installs or the
-// browser genuinely has no install path available for them (desktop
-// Safari/Firefox, or iOS with a manual "Add to Home Screen" fallback) — in
-// which case it lets them continue rather than dead-ending them.
+// Features:
+// 1. Manages expandable #installAppCard (on auth.html & settings.html).
+// 2. On feed/content pages, shows a sleek, non-blocking bottom floating bar
+//    only when the browser fires beforeinstallprompt and the user hasn't dismissed it.
+// 3. Gracefully disables when already running standalone.
 (function () {
-  const STORAGE_KEY = "clashe-install-gate-dismissed-at";
-  const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
-  const PWA_STATE_EVENT = "clashly:pwa-state";
-  const MODAL_ID = "pwa-install-gate";
-
-  function isIosLikeDevice() {
-    const ua = window.navigator.userAgent || "";
-    const platform = window.navigator.platform || "";
-    return /iphone|ipad|ipod/i.test(ua) || (platform === "MacIntel" && window.navigator.maxTouchPoints > 1);
-  }
+  const STORAGE_KEY = "clashe-pwa-bar-dismissed-at";
+  const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days cooldown after dismiss
+  const BAR_ID = "clashe-pwa-bar";
 
   function isStandaloneDisplayMode() {
     return (
@@ -41,10 +33,7 @@
   function setDismissedNow() {
     try {
       window.localStorage.setItem(STORAGE_KEY, String(Date.now()));
-    } catch (_error) {
-      // Private browsing or storage disabled — the gate will just show
-      // again next load, which is an acceptable fallback, not a crash.
-    }
+    } catch (_error) {}
   }
 
   function isWithinCooldown() {
@@ -53,142 +42,181 @@
     return Date.now() - dismissedAt < COOLDOWN_MS;
   }
 
-  function buildModal() {
-    let modal = document.getElementById(MODAL_ID);
-    if (modal) return modal;
+  // ── 1. ThinkRight-Style #installAppCard Handler ────────────────
+  function initInstallAppCard() {
+    const installCard = document.getElementById("installAppCard");
+    const installToggle = document.getElementById("installAppToggle");
+    const installBtn =
+      document.getElementById("authInstallBtn") ||
+      document.getElementById("settingsInstallBtn") ||
+      document.getElementById("loginInstallBtn");
 
-    modal = document.createElement("section");
-    modal.id = MODAL_ID;
-    modal.className = "pwa-install-gate";
-    modal.hidden = true;
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-labelledby", "pwa-install-gate-title");
-    modal.innerHTML = `
-      <div class="pwa-install-gate__panel">
-        <div class="pwa-install-gate__art" aria-hidden="true">
-          <img src="assets/clashly-mark.svg" alt="" class="pwa-install-gate__mark" />
+    if (!installCard || !installToggle) return;
+
+    if (isStandaloneDisplayMode()) {
+      installCard.hidden = true;
+      return;
+    }
+
+    if (installToggle.dataset.bound !== "1") {
+      installToggle.dataset.bound = "1";
+      installToggle.addEventListener("click", () => {
+        const isOpen = installCard.classList.toggle("is-open");
+        installToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      });
+    }
+
+    function syncBtn() {
+      const promptEvent = window.__pwaInstallPrompt;
+      if (installBtn && promptEvent && !window.__pwaInstallConsumed) {
+        installBtn.style.display = "inline-flex";
+      }
+    }
+
+    syncBtn();
+    window.addEventListener("clashly:install-prompt-ready", syncBtn);
+    window.addEventListener("beforeinstallprompt", syncBtn);
+
+    if (installBtn && installBtn.dataset.bound !== "1") {
+      installBtn.dataset.bound = "1";
+      installBtn.addEventListener("click", async () => {
+        const promptEvent = window.__pwaInstallPrompt;
+        if (promptEvent && typeof promptEvent.prompt === "function") {
+          try {
+            await promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            if (choice && choice.outcome === "accepted") {
+              installBtn.style.display = "none";
+              installCard.hidden = true;
+              window.__pwaInstallConsumed = true;
+            }
+          } catch (_err) {}
+          window.__pwaInstallPrompt = null;
+        } else if (window.ClashlyPWA && typeof window.ClashlyPWA.promptInstall === "function") {
+          window.ClashlyPWA.promptInstall().then((res) => {
+            if (res && res.outcome === "accepted") {
+              installBtn.style.display = "none";
+              installCard.hidden = true;
+            }
+          });
+        }
+      });
+    }
+  }
+
+  // ── 2. Sleek Non-Blocking Bottom Banner for Feed/Content Pages ──
+  function buildBar() {
+    let bar = document.getElementById(BAR_ID);
+    if (bar) return bar;
+
+    bar = document.createElement("aside");
+    bar.id = BAR_ID;
+    bar.className = "clashe-pwa-bar";
+    bar.setAttribute("aria-label", "Install Clashe");
+    bar.innerHTML = `
+      <div class="clashe-pwa-bar__inner">
+        <img src="assets/pwa-192.png" alt="" class="clashe-pwa-bar__icon" />
+        <div class="clashe-pwa-bar__text">
+          <strong>Install Clashe</strong>
+          <span>Add to Home screen for the best experience</span>
         </div>
-        <h2 id="pwa-install-gate-title" class="pwa-install-gate__title">Install Clashe</h2>
-        <p class="pwa-install-gate__copy" id="pwa-install-gate-copy">
-          Install Clashe for a faster, full-screen experience with no browser bar in the way.
-        </p>
-        <div class="pwa-install-gate__actions">
-          <button type="button" class="btn btn--primary pwa-install-gate__install" id="pwa-install-gate-install">
-            Install app
-          </button>
-          <button type="button" class="btn btn--ghost pwa-install-gate__dismiss" id="pwa-install-gate-dismiss">
-            Not now
-          </button>
+        <div class="clashe-pwa-bar__actions">
+          <button type="button" class="clashe-pwa-bar__btn" id="clashe-pwa-bar-install">Install</button>
+          <button type="button" class="clashe-pwa-bar__close" id="clashe-pwa-bar-close" aria-label="Dismiss">✕</button>
         </div>
       </div>
     `;
-    document.body.appendChild(modal);
-    return modal;
-  }
 
-  function showModal() {
-    const modal = buildModal();
-    modal.hidden = false;
-    document.body.classList.add("pwa-install-gate-open");
-  }
+    document.body.appendChild(bar);
 
-  function hideModal() {
-    const modal = document.getElementById(MODAL_ID);
-    if (!modal) return;
-    modal.hidden = true;
-    document.body.classList.remove("pwa-install-gate-open");
-  }
+    const installBtn = bar.querySelector("#clashe-pwa-bar-install");
+    const closeBtn = bar.querySelector("#clashe-pwa-bar-close");
 
-  function render(state) {
-    // Already running as an installed app — nothing to gate, ever.
-    if (isStandaloneDisplayMode() || (state && state.installed)) {
-      hideModal();
-      return;
+    if (installBtn) {
+      installBtn.addEventListener("click", async () => {
+        const promptEvent = window.__pwaInstallPrompt;
+        if (promptEvent && typeof promptEvent.prompt === "function") {
+          try {
+            await promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            if (choice && choice.outcome === "accepted") {
+              window.__pwaInstallConsumed = true;
+              hideBar();
+            }
+          } catch (_err) {}
+          window.__pwaInstallPrompt = null;
+        } else if (window.ClashlyPWA && typeof window.ClashlyPWA.promptInstall === "function") {
+          window.ClashlyPWA.promptInstall().then((res) => {
+            if (res && res.outcome === "accepted") {
+              hideBar();
+            }
+          });
+        }
+      });
     }
 
-    if (isWithinCooldown()) {
-      hideModal();
-      return;
-    }
-
-    const modal = buildModal();
-    const copyEl = modal.querySelector("#pwa-install-gate-copy");
-    const installBtn = modal.querySelector("#pwa-install-gate-install");
-    const canInstall = Boolean(state && state.canInstall);
-    const secureContext = !state || state.secureContext !== false;
-    const iosLike = isIosLikeDevice();
-
-    if (!secureContext) {
-      // Nothing installable over an insecure origin — don't block anyone
-      // on what would effectively be a dead end.
-      hideModal();
-      return;
-    }
-
-    if (canInstall) {
-      copyEl.textContent = "Install Clashe for a faster, full-screen experience with no browser bar in the way.";
-      installBtn.hidden = false;
-      installBtn.textContent = "Install app";
-      installBtn.disabled = false;
-    } else if (iosLike) {
-      copyEl.textContent = "Install Clashe: tap the Share icon in Safari, then choose \u201cAdd to Home Screen.\u201d";
-      installBtn.hidden = true;
-    } else {
-      // No install path this browser can offer (desktop Safari/Firefox, or
-      // Chrome/Edge before the prompt has been captured yet). Nothing to
-      // gate behind here — show once for awareness, then get out of the way.
-      copyEl.textContent =
-        "Clashe works best installed as an app. This browser doesn't support installing yet — try Chrome, Edge, or Safari on iOS.";
-      installBtn.hidden = true;
-    }
-
-    showModal();
-  }
-
-  function handleInstallClick() {
-    if (!window.ClashlyPWA || typeof window.ClashlyPWA.promptInstall !== "function") return;
-    window.ClashlyPWA.promptInstall().then((result) => {
-      if (result && (result.status === "accepted" || result.status === "installed")) {
-        hideModal();
-      }
-      // A dismissed native prompt still counts as "seen it" for the cooldown —
-      // re-showing immediately after someone just said no would be hostile.
-      setDismissedNow();
-    });
-  }
-
-  function bindOnce() {
-    const modal = buildModal();
-    if (modal.dataset.bound === "1") return;
-    modal.dataset.bound = "1";
-
-    modal.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest("#pwa-install-gate-install")) {
-        handleInstallClick();
-        return;
-      }
-      if (target.closest("#pwa-install-gate-dismiss")) {
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
         setDismissedNow();
-        hideModal();
-      }
+        hideBar();
+      });
+    }
+
+    return bar;
+  }
+
+  function showBar() {
+    if (isStandaloneDisplayMode()) return;
+    if (isWithinCooldown()) return;
+    if (document.getElementById("installAppCard")) return; // Page already has dedicated card
+
+    const bar = buildBar();
+    requestAnimationFrame(() => {
+      bar.classList.add("is-visible");
     });
+  }
+
+  function hideBar() {
+    const bar = document.getElementById(BAR_ID);
+    if (!bar) return;
+    bar.classList.remove("is-visible");
+    setTimeout(() => {
+      if (bar.parentNode) {
+        bar.parentNode.removeChild(bar);
+      }
+    }, 280);
+  }
+
+  function onPromptReady() {
+    initInstallAppCard();
+    if (!document.getElementById("installAppCard")) {
+      showBar();
+    }
   }
 
   function init() {
-    bindOnce();
+    initInstallAppCard();
 
-    if (window.ClashlyPWA && typeof window.ClashlyPWA.getState === "function") {
-      render(window.ClashlyPWA.getState());
+    if (isStandaloneDisplayMode()) return;
+
+    if (window.__pwaInstallPrompt && !window.__pwaInstallConsumed) {
+      onPromptReady();
     }
 
-    // The state machine in app.js may still be initializing when this runs
-    // (script order isn't guaranteed), so listen for its broadcast event
-    // rather than assuming window.ClashlyPWA already exists.
-    window.addEventListener(PWA_STATE_EVENT, (event) => {
-      render(event && event.detail ? event.detail : null);
+    window.addEventListener("clashly:install-prompt-ready", () => {
+      onPromptReady();
+    });
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      window.__pwaInstallPrompt = e;
+      onPromptReady();
+    });
+
+    window.addEventListener("appinstalled", () => {
+      window.__pwaInstallConsumed = true;
+      hideBar();
+      const card = document.getElementById("installAppCard");
+      if (card) card.hidden = true;
     });
   }
 

@@ -930,8 +930,76 @@
     bindOauthButton(xBtn, "x");
   }
 
+  function setupInstallAppCard() {
+    const installCard = document.getElementById("installAppCard");
+    const installToggle = document.getElementById("installAppToggle");
+    const installBtn = document.getElementById("authInstallBtn");
+
+    if (!installCard || !installToggle) return;
+
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.matchMedia("(display-mode: fullscreen)").matches ||
+      window.matchMedia("(display-mode: minimal-ui)").matches ||
+      window.navigator.standalone === true;
+
+    if (isStandalone) {
+      installCard.hidden = true;
+      return;
+    }
+
+    installToggle.addEventListener("click", () => {
+      const isOpen = installCard.classList.toggle("is-open");
+      installToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+
+    let deferredPrompt = window.__pwaInstallPrompt || null;
+
+    function revealInstallBtn() {
+      if (installBtn && deferredPrompt) {
+        installBtn.style.display = "inline-flex";
+      }
+    }
+
+    if (deferredPrompt) {
+      revealInstallBtn();
+    }
+
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      window.__pwaInstallPrompt = e;
+      revealInstallBtn();
+    });
+
+    window.addEventListener("clashly:install-prompt-ready", (e) => {
+      if (e && e.detail) {
+        deferredPrompt = e.detail;
+        revealInstallBtn();
+      }
+    });
+
+    if (installBtn) {
+      installBtn.addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        try {
+          await deferredPrompt.prompt();
+          const choice = await deferredPrompt.userChoice;
+          if (choice && choice.outcome === "accepted") {
+            installBtn.style.display = "none";
+            installCard.hidden = true;
+          }
+        } catch (_err) {
+          // ignore
+        }
+        deferredPrompt = null;
+      });
+    }
+  }
+
   async function bootAuthPage() {
     try {
+      setupInstallAppCard();
       if (!window.ClashlyAuth || !window.ClashlyProfiles) return;
 
       animatePage();
