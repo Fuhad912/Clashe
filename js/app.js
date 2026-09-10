@@ -336,16 +336,18 @@
 
   function buildMobileLink(link) {
     const activeClass = resolveActiveNavLink(link.id) ? "is-active" : "";
-    const createClass = link.id === "create" ? " bottom-nav__link--create" : "";
+    const isCreate = link.id === "create";
+    const createClass = isCreate ? " bottom-nav__link--create" : "";
     const modalAttr = link.opensModal && shouldUseCreateModal() ? ' data-open-create-modal="true"' : "";
     const unreadMarker =
       link.id === "notifications"
         ? '<span class="nav-unread-dot" id="mobile-notifications-dot" hidden aria-hidden="true"></span>'
         : "";
+    const labelHtml = isCreate ? "" : `<span class="bottom-nav__label">${link.label}</span>`;
     return `
       <a class="bottom-nav__link ${activeClass}${createClass}" href="${link.href}"${modalAttr} aria-label="${link.label}">
         <span class="bottom-nav__icon bottom-nav__icon--${link.id}" aria-hidden="true">${renderIcon(link.id)}${unreadMarker}</span>
-        <span class="bottom-nav__label">${link.label}</span>
+        ${labelHtml}
       </a>
     `;
   }

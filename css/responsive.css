@@ -447,24 +447,27 @@
   .bottom-nav__inner {
     max-width: min(390px, 100%);
     padding: 5px 6px;
-    border-radius: 28px;
+    border-radius: 20px;
   }
 
   .bottom-nav__link {
-    min-height: 50px;
-    border-radius: 18px;
+    min-height: 48px;
+    border-radius: 13px;
     padding: 4px 2px 5px;
   }
 
   .bottom-nav__active-pill {
-    border-radius: 18px;
+    border-radius: 13px;
   }
 
   .bottom-nav__link--create {
-    min-height: 50px;
-    min-width: 50px;
-    border-radius: 18px;
+    min-height: 44px;
+    min-width: 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
     transform: translateY(-4px);
+    padding: 0;
   }
 
   /* Auth on mobile */
