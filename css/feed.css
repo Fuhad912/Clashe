@@ -123,11 +123,7 @@ body[data-page="home"] .feed-head__inner {
 }
 
 .home-head__bar {
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) 32px;
-  align-items: center;
-  gap: 8px;
-  padding: 6px var(--space-4) 4px;
+  display: none !important;
 }
 
 .home-head__spacer {

@@ -731,9 +731,9 @@
 .profile-share-modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   opacity: 0;
   transition: opacity var(--transition-smooth);
 }
@@ -971,9 +971,9 @@
 }
 
 :root[data-theme="dark"] .profile-share-modal__backdrop {
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 :root[data-theme="dark"] .profile-share-preview {
