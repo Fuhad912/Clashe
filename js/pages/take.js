@@ -293,6 +293,11 @@
       }
 
       if ((payload.status === "fresh" || payload.status === "cached") && payload.result) {
+        if (payload.status === "fresh" && window.ClashlyComments && typeof window.ClashlyComments.recordAiJudgeCitations === "function") {
+          window.ClashlyComments.recordAiJudgeCitations(currentTake.id, payload.result).catch((err) => {
+            console.warn("[Clashe] Failed to record AI Judge citations:", err);
+          });
+        }
         setAiJudgeStatus(payload.status === "cached" ? "Showing recent AI Judge analysis." : "", "");
         renderAiJudgeResult(payload.result, payload.status);
         return;
@@ -353,6 +358,11 @@
       }
 
       if ((payload.status === "fresh" || payload.status === "cached") && payload.result) {
+        if (payload.status === "fresh" && window.ClashlyComments && typeof window.ClashlyComments.recordAiJudgeCitations === "function") {
+          window.ClashlyComments.recordAiJudgeCitations(input.takeId, payload.result).catch((err) => {
+            console.warn("[Clashe] Failed to record AI Judge citations:", err);
+          });
+        }
         setInlineAiJudgeState({
           status: "ready",
           source: payload.status,

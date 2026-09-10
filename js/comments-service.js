@@ -1,6 +1,7 @@
 (function () {
   const COMMENTS_TABLE = "comments";
   const COMMENT_LIKES_TABLE = "comment_likes";
+  const COMMENT_CITATIONS_TABLE = "comment_citations";
 
   function getClientOrThrow() {
     if (!window.ClashlySupabase) {
@@ -329,9 +330,131 @@
     return updateItems(comments).items;
   }
 
+  async function recordCommentCitation(input) {
+    const client = getClientOrThrow();
+    const takeId = sanitizeId(input && input.takeId);
+    const commentId = sanitizeId(input && input.commentId);
+    const rawSide = sanitizeId(input && input.side).toLowerCase();
+    const side = rawSide === "agree" || rawSide === "disagree" ? rawSide : "";
+
+    if (!takeId || !commentId || !side) {
+      return {
+        citation: null,
+        error: new Error("Valid takeId, commentId, and side ('agree' or 'disagree') are required."),
+      };
+    }
+
+    // Try atomic RPC first (runs with SECURITY DEFINER, bypassing client RLS safely)
+    const rpcResult = await client.rpc("record_comment_citation", {
+      p_take_id: takeId,
+      p_comment_id: commentId,
+      p_side: side,
+    });
+
+    if (!rpcResult.error && rpcResult.data) {
+      return {
+        citation: rpcResult.data,
+        error: null,
+      };
+    }
+
+    // Direct table fallback
+    const insertResult = await client
+      .from(COMMENT_CITATIONS_TABLE)
+      .insert({
+        take_id: takeId,
+        comment_id: commentId,
+        side,
+      })
+      .select("*")
+      .single();
+
+    if (insertResult.error) {
+      return {
+        citation: null,
+        error: rpcResult.error || insertResult.error,
+      };
+    }
+
+    // Update comment cited flag and timestamp
+    await client
+      .from(COMMENTS_TABLE)
+      .update({
+        ai_judge_cited: true,
+        ai_judge_cited_at: new Date().toISOString(),
+      })
+      .eq("id", commentId);
+
+    return {
+      citation: insertResult.data,
+      error: null,
+    };
+  }
+
+  async function recordAiJudgeCitations(takeId, judgeResult) {
+    const safeTakeId = sanitizeId(takeId);
+    if (!safeTakeId || !judgeResult || typeof judgeResult !== "object") {
+      return { citations: [], errors: [] };
+    }
+
+    const tasks = [];
+    if (judgeResult.agreeTop && judgeResult.agreeTop.commentId) {
+      tasks.push(
+        recordCommentCitation({
+          takeId: safeTakeId,
+          commentId: judgeResult.agreeTop.commentId,
+          side: "agree",
+        })
+      );
+    }
+
+    if (judgeResult.disagreeTop && judgeResult.disagreeTop.commentId) {
+      tasks.push(
+        recordCommentCitation({
+          takeId: safeTakeId,
+          commentId: judgeResult.disagreeTop.commentId,
+          side: "disagree",
+        })
+      );
+    }
+
+    if (!tasks.length) {
+      return { citations: [], errors: [] };
+    }
+
+    const results = await Promise.all(tasks);
+    const citations = [];
+    const errors = [];
+    results.forEach((res) => {
+      if (res && res.citation) citations.push(res.citation);
+      if (res && res.error) errors.push(res.error);
+    });
+
+    return { citations, errors };
+  }
+
+  async function getCitationCountForUser(userId) {
+    const safeUserId = sanitizeId(userId);
+    if (!safeUserId) return 0;
+
+    const client = getClientOrThrow();
+    const result = await client
+      .from(COMMENT_CITATIONS_TABLE)
+      .select("id, comments!inner(user_id)", { count: "exact", head: true })
+      .eq("comments.user_id", safeUserId);
+
+    if (result.error) {
+      console.warn("[Clashe] Failed to get citation count for user:", result.error);
+      return 0;
+    }
+
+    return typeof result.count === "number" ? result.count : 0;
+  }
+
   window.ClashlyComments = {
     COMMENTS_TABLE,
     COMMENT_LIKES_TABLE,
+    COMMENT_CITATIONS_TABLE,
     fetchProfilesByIds,
     validateCommentContent,
     fetchCommentsByTake,
@@ -339,5 +462,8 @@
     deleteComment,
     toggleCommentLike,
     applyCommentLikeState,
+    recordCommentCitation,
+    recordAiJudgeCitations,
+    getCitationCountForUser,
   };
 })();
