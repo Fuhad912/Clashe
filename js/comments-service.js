@@ -41,7 +41,7 @@
     const client = getClientOrThrow();
     const result = await client
       .from("profiles")
-      .select("id, username, avatar_url")
+      .select("id, username, avatar_url, clashscore")
       .in("id", userIds);
 
     return {
@@ -69,11 +69,16 @@
 
     const commentMap = new Map();
     rows.forEach((row) => {
+      const authorProfile = profileMap.get(row.user_id) || null;
+      const authorClashscore = Number((authorProfile && authorProfile.clashscore) || 0);
+
       commentMap.set(row.id, {
         ...row,
         ai_judge_cited: Boolean(row && row.ai_judge_cited),
         ai_judge_cited_at: (row && row.ai_judge_cited_at) || null,
-        profile: profileMap.get(row.user_id) || null,
+        profile: authorProfile,
+        author_clashscore: authorClashscore,
+        authorClashscore: authorClashscore,
         is_owner: Boolean(currentUserId && row.user_id === currentUserId),
         like_count: normalizeLikeCount(likeCountByCommentId.get(row.id)),
         liked_by_me: Boolean(currentUserId && likedCommentIds.has(row.id)),

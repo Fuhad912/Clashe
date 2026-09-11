@@ -27,6 +27,7 @@ const APP_SHELL_ASSETS = [
   "./js/loader.js",
   "./js/cache-service.js",
   "./js/prefetch.js",
+  "./js/clashscore-tiers.js",
   "./js/app.js",
   "./js/utils.js",
   "./js/session.js",

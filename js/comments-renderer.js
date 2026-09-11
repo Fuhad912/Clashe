@@ -45,6 +45,33 @@
         '</span>'
       );
     }
+
+    const tiersApi = window.ClasheClashscoreTiers || window.ClashlyClashscoreTiers;
+    if (tiersApi && typeof tiersApi.getClashscoreTier === "function") {
+      const rawScore =
+        comment && comment.authorClashscore !== undefined
+          ? comment.authorClashscore
+          : comment && comment.author_clashscore !== undefined
+          ? comment.author_clashscore
+          : comment && comment.profile && comment.profile.clashscore !== undefined
+          ? comment.profile.clashscore
+          : 0;
+      const tier = tiersApi.getClashscoreTier(rawScore);
+      // Skip Rookie tier (tierIndex === 0) — only render for Debater and above
+      if (tier && tier.tierIndex > 0) {
+        const tierKey = String(tier.name || "").toLowerCase();
+        badges.push(
+          `<span class="comment-item__badge comment-badge--tier" data-tier="${window.ClashlyUtils.escapeHtml(
+            tierKey
+          )}" role="status" aria-label="${window.ClashlyUtils.escapeHtml(
+            tier.name
+          )} tier" title="${window.ClashlyUtils.escapeHtml(tier.name)} tier">${window.ClashlyUtils.escapeHtml(
+            tier.name
+          )}</span>`
+        );
+      }
+    }
+
     if (isTakeAuthor(comment, options)) {
       badges.push('<span class="comment-item__badge comment-item__badge--author">Author</span>');
     }

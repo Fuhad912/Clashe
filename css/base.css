@@ -711,3 +711,56 @@ body.pwa-install-gate-open {
 .clashe-toast--success {
   border-color: rgba(255, 255, 255, 0.22);
 }
+
+/* ── Clashscore Tier Themes (Shared across Profile and Comments) ── */
+
+[data-tier="rookie"],
+.clashscore-tier-badge[data-tier="rookie"],
+.comment-badge--tier[data-tier="rookie"] {
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-surface-soft) 85%, var(--color-border));
+  border: 1px solid var(--color-border);
+}
+
+[data-tier="debater"],
+.clashscore-tier-badge[data-tier="debater"],
+.comment-badge--tier[data-tier="debater"] {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-text) 24%, var(--color-border));
+}
+
+[data-tier="sharp"],
+.clashscore-tier-badge[data-tier="sharp"],
+.comment-badge--tier[data-tier="sharp"] {
+  color: var(--color-agree);
+  background: var(--color-agree-bg);
+  border: 1px solid var(--color-agree-border);
+}
+
+[data-tier="clasher"],
+.clashscore-tier-badge[data-tier="clasher"],
+.comment-badge--tier[data-tier="clasher"] {
+  color: var(--color-disagree);
+  background: var(--color-disagree-bg);
+  border: 1px solid var(--color-disagree-border);
+}
+
+[data-tier="legend"],
+.clashscore-tier-badge[data-tier="legend"],
+.comment-badge--tier[data-tier="legend"] {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-brand) 45%, var(--color-border-strong));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-brand) 25%, transparent);
+}
+
+:root[data-theme="dark"] [data-tier="legend"],
+:root[data-theme="dark"] .clashscore-tier-badge[data-tier="legend"],
+:root[data-theme="dark"] .comment-badge--tier[data-tier="legend"] {
+  color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 18%, var(--color-surface-soft));
+  border-color: color-mix(in srgb, var(--color-brand) 55%, var(--color-border-strong));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 38%, transparent);
+}
+
