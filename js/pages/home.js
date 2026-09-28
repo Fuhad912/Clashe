@@ -225,7 +225,8 @@
         <section class="feed-empty-visual" aria-label="No following activity yet">
           <div class="feed-empty-visual__art" aria-hidden="true">
             <span class="feed-empty-visual__glow"></span>
-            <img src="assets/clashly-mark.svg" alt="" class="feed-empty-visual__mark" />
+            <img src="assets/Lightmode_logo.svg" alt="Clashe" class="feed-empty-visual__mark theme-logo theme-logo--light" />
+            <img src="assets/Darkmode_logo.svg" alt="Clashe" class="feed-empty-visual__mark theme-logo theme-logo--dark" />
           </div>
           <div class="feed-empty-visual__copy">
             <p class="feed-empty-visual__eyebrow">Following</p>

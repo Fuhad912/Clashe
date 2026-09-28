@@ -347,17 +347,13 @@ label {
   color: var(--color-text);
 }
 
-.modal-close-btn svg {
+.modal-close-btn .app-icon {
   display: block;
   flex-shrink: 0;
 }
 
 :root:not([data-theme="dark"]) .modal-close-btn {
   color: var(--color-text);
-}
-
-:root:not([data-theme="dark"]) .modal-close-btn svg {
-  stroke-width: 2.25;
 }
 
 :root[data-theme="dark"] .modal-close-btn:hover {
@@ -764,3 +760,136 @@ body.pwa-install-gate-open {
   box-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 38%, transparent);
 }
 
+
+/* Keep floating feedback above the mobile dock, including tablet layouts. */
+@media (max-width: 1024px) {
+  body:has(.bottom-nav) .clashe-toast-container,
+  body:has(.bottom-nav) .clashe-pwa-bar {
+    bottom: calc(var(--mobile-nav-clearance, 96px) - 8px + env(safe-area-inset-bottom, 0px));
+  }
+  body:has(.bottom-nav) .app-legal-footer {
+    padding-bottom: calc(var(--mobile-nav-clearance, 96px) + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* Feedback motion: a single short response to a real state change. */
+@keyframes clashe-action-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.78) rotate(-7deg); }
+  68% { transform: scale(1.24) rotate(4deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+@keyframes clashe-action-release {
+  0% { transform: scale(1); }
+  45% { transform: scale(0.82); }
+  100% { transform: scale(1); }
+}
+
+@keyframes clashe-action-ring {
+  0% { opacity: 0.55; transform: scale(0.55); }
+  65% { opacity: 0.4; }
+  100% { opacity: 0; transform: scale(1.75); }
+}
+
+@keyframes clashe-action-sparks {
+  0% { opacity: 0; transform: scale(0.55); }
+  38% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(1.35); }
+}
+
+@keyframes clashe-count-rise {
+  from { opacity: 0.45; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.take-action--vote,
+.take-action--bookmark,
+.comment-action--like {
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.take-action--vote.is-motion-enter .take-action__icon,
+.take-action--bookmark.is-motion-enter .take-action__icon,
+.comment-action--like.is-motion-enter .comment-action__icon {
+  animation: clashe-action-pop 390ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.take-action--vote.is-motion-exit .take-action__icon,
+.take-action--bookmark.is-motion-exit .take-action__icon,
+.comment-action--like.is-motion-exit .comment-action__icon {
+  animation: clashe-action-release 230ms ease-out both;
+}
+
+.take-action--vote.is-motion-enter .take-action__count,
+.comment-action--like.is-motion-enter .comment-action__count {
+  animation: clashe-count-rise 260ms ease-out both;
+}
+
+.take-action--vote.is-motion-enter .take-action__icon::after,
+.take-action--bookmark.is-motion-enter .take-action__icon::after,
+.comment-action--like.is-motion-enter .comment-action__icon::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: clashe-action-ring 430ms ease-out both;
+}
+
+.take-action--vote.is-motion-enter .take-action__icon::before,
+.take-action--bookmark.is-motion-enter .take-action__icon::before,
+.comment-action--like.is-motion-enter .comment-action__icon::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  background:
+    radial-gradient(circle, currentColor 43%, transparent 48%) top left / 6px 6px no-repeat,
+    radial-gradient(circle, currentColor 43%, transparent 48%) top right / 6px 6px no-repeat,
+    radial-gradient(circle, currentColor 43%, transparent 48%) bottom left / 6px 6px no-repeat,
+    radial-gradient(circle, currentColor 43%, transparent 48%) bottom right / 6px 6px no-repeat;
+  opacity: 0;
+  pointer-events: none;
+  animation: clashe-action-sparks 480ms ease-out both;
+}
+
+.take-action--vote .take-action__icon,
+.take-action--bookmark .take-action__icon,
+.comment-action--like .comment-action__icon {
+  position: relative;
+}
+
+.take-action--share .take-action__icon,
+.take-action--comments .take-action__icon {
+  transition: transform 150ms ease-out;
+}
+
+.take-action--share:active .take-action__icon { transform: translate(2px, -2px) rotate(7deg); }
+.take-action--comments:active .take-action__icon { transform: scale(0.86); }
+
+@media (prefers-reduced-motion: reduce) {
+  .take-vote-split__agree,
+  .take-vote-split__disagree { transition: none; }
+  .take-action--share .take-action__icon,
+  .take-action--comments .take-action__icon { transition: none; }
+  .take-action--share:active .take-action__icon,
+  .take-action--comments:active .take-action__icon { transform: none; }
+  .take-action--vote.is-motion-enter .take-action__icon,
+  .take-action--bookmark.is-motion-enter .take-action__icon,
+  .comment-action--like.is-motion-enter .comment-action__icon,
+  .take-action--vote.is-motion-exit .take-action__icon,
+  .take-action--bookmark.is-motion-exit .take-action__icon,
+  .comment-action--like.is-motion-exit .comment-action__icon,
+  .take-action--vote.is-motion-enter .take-action__count,
+  .comment-action--like.is-motion-enter .comment-action__count,
+  .take-action--vote.is-motion-enter .take-action__icon::before,
+  .take-action--bookmark.is-motion-enter .take-action__icon::before,
+  .comment-action--like.is-motion-enter .comment-action__icon::before,
+  .take-action--vote.is-motion-enter .take-action__icon::after,
+  .take-action--bookmark.is-motion-enter .take-action__icon::after,
+  .comment-action--like.is-motion-enter .comment-action__icon::after {
+    animation: none;
+  }
+}

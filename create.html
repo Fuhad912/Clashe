@@ -24,6 +24,7 @@
     <meta name="apple-mobile-web-app-title" content="Clashe" />
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/icons.css" />
     <link rel="stylesheet" href="css/loader.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/create.css" />
@@ -57,16 +58,12 @@
               >
                 <span class="category-picker-trigger__content">
                   <span class="category-picker-trigger__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M4 7h16M4 12h16M4 17h10"></path>
-                    </svg>
+                    <i class="app-icon fa-solid fa-list" aria-hidden="true"></i>
                   </span>
                   <span class="category-picker-trigger__text is-placeholder" id="take-category-trigger-text">Select a category</span>
                 </span>
                 <span class="category-picker-trigger__chevron" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m6 9 6 6 6-6"></path>
-                  </svg>
+                  <i class="app-icon fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </span>
               </button>
               <p class="composer-hint">Pick one lane.</p>
@@ -138,6 +135,7 @@
     <script src="js/categories-service.js"></script>
     <script src="js/category-modal.js"></script>
     <script src="js/takes-service.js"></script>
+    <script src="js/push-service.js"></script>
     <script src="js/app.js"></script>
     <script src="js/pwa-install-gate.js"></script>
     <script src="js/pages/create.js"></script>

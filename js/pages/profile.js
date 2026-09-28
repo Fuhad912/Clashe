@@ -11,7 +11,6 @@
     followersCount: 0,
     followingCount: 0,
   };
-  let citationCount = 0;
   let currentFollowListMode = "followers";
   let currentFollowListUsers = [];
   let editProfileAvatarFile = null;
@@ -131,8 +130,6 @@
     const followersCountEl = document.getElementById("followers-count");
     const followingCountEl = document.getElementById("following-count");
     const clashscoreCountEl = document.getElementById("clashscore-count");
-    const topArgumentsCountEl = document.getElementById("top-arguments-count");
-    const topArgumentsStatEl = document.getElementById("profile-stat-top-arguments");
     const username = profile && profile.username ? `@${profile.username}` : "@username";
 
     if (usernameEl) usernameEl.textContent = username;
@@ -154,10 +151,6 @@
     if (followingCountEl) followingCountEl.textContent = String(followStats.followingCount);
     const clashscore = getDisplayedClashscore(profile, currentTakes);
     if (clashscoreCountEl) clashscoreCountEl.textContent = formatWholeNumber(clashscore);
-    if (topArgumentsCountEl) topArgumentsCountEl.textContent = formatWholeNumber(citationCount);
-    if (topArgumentsStatEl) {
-      topArgumentsStatEl.classList.toggle("has-citations", citationCount > 0);
-    }
 
     renderClashscoreTier(clashscore);
   }
@@ -171,17 +164,9 @@
     const tier = tiersApi.getClashscoreTier(score);
     const tierKey = String(tier && tier.name ? tier.name : "rookie").toLowerCase();
 
-    // 1. Mini badge in stats row
-    const statBadge = document.getElementById("clashscore-tier-badge");
-    if (statBadge) {
-      statBadge.textContent = tier.name;
-      statBadge.dataset.tier = tierKey;
-    }
-
-    // 2. Full-width progress strip below hero
+    // Score and tier share a single card below the profile hero.
     const progressCard = document.getElementById("profile-tier-progress");
     const progressBadge = document.getElementById("profile-tier-progress-badge");
-    const currentScoreEl = document.getElementById("profile-tier-current-score");
     const statusEl = document.getElementById("profile-tier-progress-status");
     const trackEl = document.getElementById("profile-tier-progress-track");
     const fillEl = document.getElementById("profile-tier-progress-fill");
@@ -195,16 +180,10 @@
       progressBadge.dataset.tier = tierKey;
     }
 
-    if (currentScoreEl) {
-      currentScoreEl.textContent = formatWholeNumber(score);
-    }
-
     if (statusEl) {
       if (tier.nextTierMinScore === null) {
         statusEl.innerHTML = `
-          <svg viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">
-            <path d="M8 1l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 11.8l-4.2 2.2.8-4.7L1.2 6l4.7-.7L8 1z"/>
-          </svg>
+          <i class="app-icon fa-solid fa-star" aria-hidden="true"></i>
           <span>Max tier reached</span>
         `;
         statusEl.classList.add("is-max-tier");
@@ -215,7 +194,7 @@
         const nextTierName = nextTier ? nextTier.name : "";
         const remaining = Math.max(0, tier.nextTierMinScore - score);
 
-        statusEl.textContent = `${formatWholeNumber(score)} / ${formatWholeNumber(tier.nextTierMinScore)} to ${nextTierName}`;
+        statusEl.textContent = `${formatWholeNumber(remaining)} points to ${nextTierName}`;
         statusEl.title = `${formatWholeNumber(remaining)} points to ${nextTierName}`;
         statusEl.classList.remove("is-max-tier");
 
@@ -449,8 +428,45 @@
   }
 
   function getPinnedTake(takes) {
-    if (!takes.length) return null;
+    if (!takes || !takes.length) return null;
+    const pinned = takes.find((t) => t.is_pinned);
+    if (pinned) return pinned;
     return [...takes].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+  }
+
+  async function applyPinnedTakeOrdering(takes, profile, currentUserId) {
+    const pinnedTakeId = window.ClashlyProfiles ? window.ClashlyProfiles.getPinnedTakeId(profile) : (profile && profile.pinned_take_id);
+    if (!pinnedTakeId) {
+      return (takes || []).map((t) => ({ ...t, is_pinned: false }));
+    }
+
+    let list = (takes || []).map((t) => ({
+      ...t,
+      is_pinned: t.id === pinnedTakeId,
+    }));
+
+    const pinnedIndex = list.findIndex((t) => t.id === pinnedTakeId);
+    if (pinnedIndex > -1) {
+      if (pinnedIndex > 0) {
+        const [pinnedTake] = list.splice(pinnedIndex, 1);
+        list.unshift(pinnedTake);
+      }
+      return list;
+    }
+
+    try {
+      if (window.ClashlyTakes && typeof window.ClashlyTakes.fetchTakeById === "function") {
+        const { take: fetchedTake, error } = await window.ClashlyTakes.fetchTakeById(pinnedTakeId, { currentUserId });
+        if (!error && fetchedTake && profile && fetchedTake.user_id === profile.id) {
+          fetchedTake.is_pinned = true;
+          list.unshift(fetchedTake);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch pinned take by ID:", e);
+    }
+
+    return list;
   }
 
   function getMostControversialTake(takes) {
@@ -530,11 +546,12 @@
     if (agreeEl) agreeEl.textContent = String(voteTotals.agree);
     if (disagreeEl) disagreeEl.textContent = String(voteTotals.disagree);
 
+    const hasPinned = currentTakes.some((t) => t.is_pinned);
     renderHighlightCard(
       pinnedEl,
       getPinnedTake(currentTakes),
       "No takes yet. Post something sharp and it will anchor this profile.",
-      "Latest"
+      hasPinned ? "Pinned" : "Latest"
     );
     renderHighlightCard(
       controversialEl,
@@ -583,6 +600,7 @@
       window.ClashlyTakeRenderer.renderTakeGrid(feedEl, activeFeedTakes, {
         currentUserId: currentUser ? currentUser.id : "",
         showDeleteAction: true,
+        showPinAction: isOwnProfile && activeTab === "takes",
         emptyMessage: getProfileFeedEmptyMessage(isSavedTab),
       });
     } else {
@@ -590,6 +608,7 @@
         compact: true,
         currentUserId: currentUser ? currentUser.id : "",
         showDeleteAction: true,
+        showPinAction: isOwnProfile && activeTab === "takes",
         emptyMessage: getProfileFeedEmptyMessage(isSavedTab),
       });
     }
@@ -608,6 +627,10 @@
     });
     window.ClashlyTakeRenderer.bindCommentActions(feedEl, {
       onComments: handleCommentsOpen,
+    });
+    window.ClashlyTakeRenderer.bindPinActions(feedEl, {
+      onStatus: setFeedState,
+      onPin: handleTakePin,
     });
     window.ClashlyTakeRenderer.bindDeleteActions(feedEl, {
       onStatus: setFeedState,
@@ -664,7 +687,11 @@
       });
       if (takesState.error) throw takesState.error;
 
-      const incoming = takesState.takes || [];
+      const pinnedTakeId = window.ClashlyProfiles ? window.ClashlyProfiles.getPinnedTakeId(currentProfile) : (currentProfile && currentProfile.pinned_take_id);
+      let incoming = takesState.takes || [];
+      if (pinnedTakeId) {
+        incoming = incoming.filter((t) => t.id !== pinnedTakeId);
+      }
       currentTakes = currentTakes.concat(incoming);
       takesCursor = takesState.nextCursor || null;
       takesHasMore = Boolean(takesState.hasMore);
@@ -1277,6 +1304,13 @@
 
       if (result.error) throw result.error;
 
+      if (currentProfile && currentProfile.pinned_take_id === input.takeId) {
+        currentProfile.pinned_take_id = null;
+        if (window.ClashlyProfiles && typeof window.ClashlyProfiles.setPinnedTake === "function") {
+          window.ClashlyProfiles.setPinnedTake(currentUser.id, null).catch(() => {});
+        }
+      }
+
       removeTakeFromState(input.takeId);
       renderProfile(currentProfile, currentUser.email || "");
       renderProfileInsights();
@@ -1288,6 +1322,49 @@
       updateTakeDeleteLoadingState(input.takeId, false);
       renderProfileFeed();
       throw error;
+    }
+  }
+
+  async function handleTakePin(input) {
+    if (!currentUser || !currentProfile || !isOwnProfile) return;
+    const targetTake = currentTakes.find((t) => t.id === input.takeId);
+    if (!targetTake) return;
+
+    const willBePinned = !input.isPinned;
+    const newPinnedId = willBePinned ? targetTake.id : null;
+
+    currentTakes = currentTakes.map((take) => ({
+      ...take,
+      is_pinned: willBePinned && take.id === targetTake.id,
+    }));
+
+    if (willBePinned) {
+      const idx = currentTakes.findIndex((t) => t.id === targetTake.id);
+      if (idx > 0) {
+        const [pinnedItem] = currentTakes.splice(idx, 1);
+        currentTakes.unshift(pinnedItem);
+      }
+    } else {
+      currentTakes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
+    currentProfile.pinned_take_id = newPinnedId;
+    renderProfileInsights();
+    renderProfileFeed();
+    saveCurrentProfileState();
+
+    const toastMsg = willBePinned ? "Take pinned to profile" : "Take unpinned from profile";
+    if (window.ClashlyUtils && typeof window.ClashlyUtils.showToast === "function") {
+      window.ClashlyUtils.showToast(toastMsg, "success");
+    }
+
+    try {
+      if (window.ClashlyProfiles && typeof window.ClashlyProfiles.setPinnedTake === "function") {
+        const res = await window.ClashlyProfiles.setPinnedTake(currentUser.id, newPinnedId);
+        if (res && res.error) throw res.error;
+      }
+    } catch (err) {
+      console.warn("Could not save pinned take state:", err);
     }
   }
 
@@ -1391,11 +1468,17 @@
       }
 
       if (profileState.error) {
+        if (typeof window.clasheRemoveProfileSkeleton === "function") {
+          window.clasheRemoveProfileSkeleton();
+        }
         setMetaStatus("Could not load profile details.", "error");
         return;
       }
 
       if (!profileState.profile) {
+        if (typeof window.clasheRemoveProfileSkeleton === "function") {
+          window.clasheRemoveProfileSkeleton();
+        }
         setMetaStatus("Profile not found.", "error");
         return;
       }
@@ -1425,16 +1508,12 @@
             })
           : Promise.resolve({ takes: [], nextCursor: null, hasMore: false }),
         loadFollowState(),
-        window.ClashlyComments && typeof window.ClashlyComments.getCitationCountForUser === "function"
-          ? window.ClashlyComments.getCitationCountForUser(currentProfile.id)
-          : Promise.resolve(0),
       ];
 
-      const [takesState, savedState, followState, fetchedCitationCount] = await Promise.all(parallelFetches);
-      citationCount = typeof fetchedCitationCount === "number" ? Math.max(0, fetchedCitationCount) : 0;
+      const [takesState, savedState, followState] = await Promise.all(parallelFetches);
 
       if (takesState.error) throw takesState.error;
-      currentTakes = takesState.takes || [];
+      currentTakes = await applyPinnedTakeOrdering(takesState.takes || [], currentProfile, userState.user.id);
       takesCursor = takesState.nextCursor || null;
       takesHasMore = Boolean(takesState.hasMore);
       takesLoading = false;
@@ -1666,7 +1745,12 @@
     if (!newTake || !currentProfile || !currentUser) return;
     if (newTake.user_id !== currentProfile.id) return;
     if (!currentTakes.some((t) => t.id === newTake.id)) {
-      currentTakes.unshift(newTake);
+      const hasPinned = currentTakes.length > 0 && currentTakes[0].is_pinned;
+      if (hasPinned) {
+        currentTakes.splice(1, 0, newTake);
+      } else {
+        currentTakes.unshift(newTake);
+      }
     }
     const countEl = document.getElementById("takes-count");
     if (countEl) {
@@ -1705,7 +1789,6 @@
       savedTakes: currentSavedTakes,
       isOwnProfile,
       followStats,
-      citationCount,
       isFollowing,
     });
   }
@@ -1723,7 +1806,6 @@
       currentSavedTakes = cachedData.savedTakes || [];
       isOwnProfile = Boolean(cachedData.isOwnProfile);
       followStats = cachedData.followStats || followStats;
-      citationCount = typeof cachedData.citationCount === "number" ? cachedData.citationCount : 0;
       isFollowing = Boolean(cachedData.isFollowing);
 
       if (typeof window.clasheRemoveProfileSkeleton === "function") {
@@ -1792,7 +1874,6 @@
       currentSavedTakes = cachedData.savedTakes || [];
       isOwnProfile = Boolean(cachedData.isOwnProfile);
       followStats = cachedData.followStats || followStats;
-      citationCount = typeof cachedData.citationCount === "number" ? cachedData.citationCount : 0;
       isFollowing = Boolean(cachedData.isFollowing);
 
       if (typeof window.clasheRemoveProfileSkeleton === "function") {

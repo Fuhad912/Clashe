@@ -99,9 +99,10 @@
   flex: 0 0 auto;
 }
 
-.composer-upload__icon svg {
+.composer-upload__icon .app-icon {
   width: 20px;
   height: 20px;
+  font-size: 20px;
 }
 
 .composer-upload__copy {
@@ -338,9 +339,10 @@
   flex: 0 0 auto;
 }
 
-.category-picker-trigger__icon svg {
+.category-picker-trigger__icon .app-icon {
   width: 18px;
   height: 18px;
+  font-size: 18px;
 }
 
 .category-picker-trigger__text {
@@ -395,9 +397,10 @@
   transition: transform var(--transition-fast), color var(--transition-fast);
 }
 
-.category-picker-trigger__chevron svg {
+.category-picker-trigger__chevron .app-icon {
   width: 18px;
   height: 18px;
+  font-size: 18px;
 }
 
 .category-picker-trigger:hover .category-picker-trigger__chevron {
@@ -549,9 +552,10 @@
   justify-content: center;
 }
 
-.category-modal__search-icon svg {
+.category-modal__search-icon .app-icon {
   width: 18px;
   height: 18px;
+  font-size: 18px;
 }
 
 .category-modal__search-input {
@@ -682,9 +686,10 @@
   flex-shrink: 0;
 }
 
-.category-item__check svg {
+.category-item__check .app-icon {
   width: 13px;
   height: 13px;
+  font-size: 13px;
 }
 
 .category-item.is-selected .category-item__check {
@@ -725,9 +730,10 @@
   color: var(--color-text-muted);
 }
 
-.category-modal__empty-icon svg {
+.category-modal__empty-icon .app-icon {
   width: 24px;
   height: 24px;
+  font-size: 24px;
 }
 
 .category-modal__empty-title {

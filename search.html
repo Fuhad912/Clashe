@@ -26,6 +26,7 @@
     <meta name="apple-mobile-web-app-title" content="Clashe" />
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/icons.css" />
     <link rel="stylesheet" href="css/loader.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/create.css" />
@@ -42,9 +43,7 @@
       <section class="search-shell">
         <header class="feed-head search-shell__head">
           <a id="search-back-link" class="search-back-link" href="search.html" hidden aria-label="Back to search discovery">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="m15 18-6-6 6-6"></path>
-            </svg>
+            <i class="app-icon fa-solid fa-arrow-left" aria-hidden="true"></i>
             <span>Back to search</span>
           </a>
           <div class="search-shell__title">
@@ -54,10 +53,7 @@
           <form id="search-page-form" class="page-search page-search--results" role="search" novalidate>
             <label class="page-search__field" for="search-page-input">
               <span class="page-search__icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="11" cy="11" r="6"></circle>
-                  <path d="m20 20-4.2-4.2"></path>
-                </svg>
+                <i class="app-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
               </span>
               <input
                 id="search-page-input"
@@ -161,6 +157,7 @@
     <script src="js/comments-renderer.js"></script>
     <script src="js/comments-modal.js"></script>
     <script src="js/share-modal.js"></script>
+    <script src="js/push-service.js"></script>
     <script src="js/app.js"></script>
     <script src="js/pwa-install-gate.js"></script>
     <script src="js/pages/search.js"></script>

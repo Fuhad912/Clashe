@@ -208,11 +208,12 @@
   transform: none;
 }
 
-.auth-google-btn svg,
-.auth-x-btn svg {
+.auth-google-btn .app-icon,
+.auth-x-btn .app-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
+  font-size: 18px;
 }
 
 /* ─── Form layout ────────────────────────────────────────────── */
@@ -466,9 +467,10 @@
   transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base);
 }
 
-.auth-check__box svg {
+.auth-check__box .app-icon {
   width: 12px;
   height: 12px;
+  font-size: 12px;
 }
 
 .auth-check input:checked + .auth-check__box {
@@ -638,12 +640,13 @@
   line-height: 0;
 }
 
-.otp-close-btn svg,
-.forgot-close-btn svg {
+.otp-close-btn .app-icon,
+.forgot-close-btn .app-icon {
   width: 18px;
   height: 18px;
   flex: none;
   pointer-events: none;
+  font-size: 18px;
 }
 
 .otp-close-btn:hover,

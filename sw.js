@@ -1,4 +1,4 @@
-const VERSION = "clashe-pwa-v8";
+const VERSION = "clashe-pwa-v16";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -13,6 +13,17 @@ const APP_SHELL_ASSETS = [
   "./take.html",
   "./css/variables.css",
   "./css/base.css",
+  "./css/icons.css",
+  "./assets/vendor/fontawesome-6.7.2/css/brands.min.css",
+  "./assets/vendor/fontawesome-6.7.2/css/fontawesome.min.css",
+  "./assets/vendor/fontawesome-6.7.2/css/regular.min.css",
+  "./assets/vendor/fontawesome-6.7.2/css/solid.min.css",
+  "./assets/vendor/fontawesome-6.7.2/webfonts/fa-brands-400.ttf",
+  "./assets/vendor/fontawesome-6.7.2/webfonts/fa-brands-400.woff2",
+  "./assets/vendor/fontawesome-6.7.2/webfonts/fa-regular-400.ttf",
+  "./assets/vendor/fontawesome-6.7.2/webfonts/fa-regular-400.woff2",
+  "./assets/vendor/fontawesome-6.7.2/webfonts/fa-solid-900.ttf",
+  "./assets/vendor/fontawesome-6.7.2/webfonts/fa-solid-900.woff2",
   "./css/loader.css",
   "./css/layout.css",
   "./css/feed.css",
@@ -29,6 +40,7 @@ const APP_SHELL_ASSETS = [
   "./js/prefetch.js",
   "./js/clashscore-tiers.js",
   "./js/app.js",
+  "./js/push-service.js",
   "./js/utils.js",
   "./js/session.js",
   "./js/pages/home.js",
@@ -176,7 +188,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (isSameOrigin && /\.(?:css|js|png|jpg|jpeg|svg|webp|webmanifest)$/i.test(url.pathname)) {
+  if (isSameOrigin && /\.(?:css|js|woff2?|ttf|png|jpg|jpeg|svg|webp|webmanifest)$/i.test(url.pathname)) {
     event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
     return;
   }
@@ -189,4 +201,59 @@ self.addEventListener("fetch", (event) => {
   if (isRemoteStaticAsset(request, url)) {
     event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
   }
+});
+
+self.addEventListener("push", (event) => {
+  let message = {};
+  try {
+    const parsed = event.data ? event.data.json() : {};
+    if (parsed && typeof parsed === "object") message = parsed;
+  } catch (_) {}
+  const title = typeof message.title === "string" ? message.title.slice(0, 80) : "Clashe";
+  const body = typeof message.body === "string" ? message.body.slice(0, 180) : "You have a new notification.";
+  let url = new URL("./notifications.html", self.location.href);
+  try {
+    const candidate = new URL(message.url || "./notifications.html", self.registration.scope);
+    if (candidate.origin === self.location.origin && candidate.href.startsWith(self.registration.scope)) url = candidate;
+  } catch (_) {}
+  event.waitUntil((async () => {
+    // Web Push subscriptions promise a visible notification for every push.
+    await self.registration.showNotification(title, {
+      body,
+      icon: new URL("./assets/pwa-192.png", self.registration.scope).href,
+      badge: new URL("./assets/pwa-192.png", self.registration.scope).href,
+      tag: message.id ? `clashe-${String(message.id).slice(0, 100)}` : "clashe-notification",
+      data: { url: url.href },
+    });
+    if (typeof self.registration.setAppBadge === "function") {
+      await self.registration.setAppBadge(1).catch(() => {});
+    }
+  })());
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const fallback = new URL("./notifications.html", self.registration.scope);
+    let target = fallback;
+    try {
+      const candidate = new URL(event.notification.data?.url || fallback.href, self.registration.scope);
+      if (candidate.origin === self.location.origin && candidate.href.startsWith(self.registration.scope)) target = candidate;
+    } catch (_) {}
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    const current = windows.find((client) => client.url === target.href) || windows.find((client) => client.url.startsWith(self.registration.scope));
+    if (current) {
+      try {
+        if (current.url !== target.href && typeof current.navigate === "function") await current.navigate(target.href);
+        await current.focus();
+      } catch (_) {
+        await self.clients.openWindow(target.href);
+      }
+    } else {
+      await self.clients.openWindow(target.href);
+    }
+    if (typeof self.registration.clearAppBadge === "function") {
+      await self.registration.clearAppBadge().catch(() => {});
+    }
+  })());
 });

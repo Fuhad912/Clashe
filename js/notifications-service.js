@@ -699,6 +699,9 @@
 
     if (!result.error) {
       invalidateNotificationCacheForUser(userId);
+      if (result.data && result.data.id && window.ClashlyPush) {
+        window.ClashlyPush.sendNotification(result.data.id).catch(() => {});
+      }
     }
 
     // Always dispatch email notification via Clashe email service
@@ -731,7 +734,7 @@
     }
 
     const cacheKey = `${safeUserId}|${limit}`;
-    if (!cursor) {
+    if (!cursor && !(options && options.fresh)) {
       const cached = getCachedNotifications(cacheKey);
       if (cached) return cached;
     }

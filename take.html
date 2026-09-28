@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Clashe | Take</title>
+    <title>Clashe | Debate</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -38,6 +38,7 @@
     <meta name="apple-mobile-web-app-title" content="Clashe" />
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/icons.css" />
     <link rel="stylesheet" href="css/loader.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/create.css" />
@@ -51,19 +52,35 @@
 
     <main class="app-main app-main--take">
       <section class="take-detail">
+        <header class="feed-head take-head">
+          <div class="feed-head__inner take-head__inner">
+            <a id="take-back-link" class="take-back-link" href="index.html" aria-label="Go back">
+              <i class="app-icon fa-solid fa-arrow-left" aria-hidden="true"></i>
+              <span>Back</span>
+            </a>
+            <h1 class="page-title take-head__title">Debate</h1>
+          </div>
+        </header>
+
         <p id="take-state" class="feed-state">Loading take...</p>
         <section id="take-detail-stream"></section>
 
         <section id="ai-judge-panel" class="ai-judge" aria-label="AI Judge panel">
           <header class="ai-judge__head">
-            <div>
-              <p class="ai-judge__eyebrow">AI Judge</p>
+            <div class="ai-judge__head-titles">
+              <p class="ai-judge__eyebrow">
+                <i class="app-icon fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                <span>AI Judge</span>
+              </p>
               <h2 class="ai-judge__title">Debate analysis</h2>
             </div>
             <button type="button" class="btn btn--ghost ai-judge__trigger" id="ai-judge-trigger">
-              Analyze with AI Judge
+              <i class="app-icon fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+              <span>Analyze with AI Judge</span>
             </button>
           </header>
+
+          <div id="ai-judge-countdown" class="ai-judge__countdown" hidden></div>
 
           <p id="ai-judge-status" class="ai-judge__status" hidden></p>
 
@@ -79,11 +96,12 @@
         <section class="comments-shell" aria-label="Comments section">
           <header class="comments-shell__head">
             <div class="comments-shell__title">
-              <p class="comments-shell__eyebrow">Comments</p>
+              <p class="comments-shell__eyebrow">Discussion</p>
               <h2><span id="comments-total">0</span> comments</h2>
             </div>
-            <label class="comments-sort">
-              <span>Sort</span>
+            <label class="comments-sort" for="comments-sort">
+              <i class="app-icon fa-solid fa-arrow-down-short-wide" aria-hidden="true"></i>
+              <span class="visually-hidden">Sort</span>
               <select id="comments-sort">
                 <option value="newest">Newest</option>
                 <option value="oldest">Oldest</option>
@@ -91,19 +109,19 @@
             </label>
           </header>
 
-          <p id="comments-state" class="feed-state">Loading comments...</p>
-          <section id="comments-thread" class="comments-thread" aria-label="Take comments"></section>
-
           <form id="comment-form" class="comment-compose" novalidate>
             <div class="comment-compose__head">
               <div>
                 <p class="comment-compose__title">Join the debate</p>
-                <p class="comment-compose__subtitle">Drop a direct response or jump into a side thread.</p>
+                <p class="comment-compose__subtitle">Share your take or respond to arguments.</p>
               </div>
             </div>
             <div class="comment-compose__replying" id="comment-replying" hidden>
               <span id="comment-replying-text">Replying</span>
-              <button type="button" class="comment-compose__cancel" id="comment-cancel-reply">Cancel</button>
+              <button type="button" class="comment-compose__cancel" id="comment-cancel-reply">
+                <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
+                <span>Cancel</span>
+              </button>
             </div>
             <label class="comment-compose__field" for="comment-input">
               <textarea
@@ -119,8 +137,31 @@
               <button type="submit" class="btn btn--primary" id="comment-submit">Post</button>
             </footer>
           </form>
+
+          <p id="comments-state" class="feed-state">Loading comments...</p>
+          <section id="comments-thread" class="comments-thread" aria-label="Take comments"></section>
         </section>
       </section>
+
+      <aside class="side-column" aria-label="Supplementary debate context">
+        <section class="side-block">
+          <h2 class="side-block__title">AI Judge</h2>
+          <p class="side-block__text">
+            When debate reaches threshold activity, the AI Judge evaluates arguments from both sides to issue an objective consensus verdict.
+          </p>
+          <div class="side-block__meta">
+            <span class="take-item__dot">•</span>
+            <span>Objective evaluation</span>
+          </div>
+        </section>
+
+        <section class="side-block">
+          <h2 class="side-block__title">Debate rules</h2>
+          <p class="side-block__text">
+            Clashe thrives on sharp, constructive disagreement. Vote your perspective, back up your stance with sound reasoning, and challenge ideas with respect.
+          </p>
+        </section>
+      </aside>
     </main>
 
     <nav id="bottom-nav" class="bottom-nav" aria-label="Mobile navigation"></nav>
@@ -145,8 +186,10 @@
     <script src="js/comments-renderer.js"></script>
     <script src="js/ai-judge-service.js"></script>
     <script src="js/share-modal.js"></script>
+    <script src="js/push-service.js"></script>
     <script src="js/app.js"></script>
     <script src="js/pwa-install-gate.js"></script>
     <script src="js/pages/take.js"></script>
   </body>
 </html>
+

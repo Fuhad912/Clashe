@@ -23,8 +23,15 @@
     "hashtag",
     "create",
   ]);
+  let bottomNavResizeObserver = null;
   let notificationsUserId = "";
   let notificationsItems = [];
+  let notificationWatcherUserId = "";
+  let notificationWatcherTimer = null;
+  let notificationRefreshPromise = null;
+  let notificationBannerTimer = null;
+  const seenNotificationIdsByUser = new Map();
+  const NOTIFICATION_SEEN_PREFIX = "clashe-notification-banner-seen:";
   let onboardingActiveUserId = "";
   let onboardingShownForUserId = "";
   let deferredInstallPrompt = null;
@@ -56,9 +63,9 @@
   const mobileLinks = [
     { id: "home", label: "Home", href: "index.html" },
     { id: "search", label: "Search", href: "search.html" },
-    { id: "create", label: "Create", href: "create.html", opensModal: true },
     { id: "notifications", label: "Notifications", href: "notifications.html" },
     { id: "profile", label: "Profile", href: "profile.html" },
+    { id: "create", label: "Create", href: "create.html", opensModal: true },
   ];
 
   function isStandaloneDisplayMode() {
@@ -268,46 +275,25 @@
   function renderIcon(id) {
     const icons = {
       home: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 10.5 12 3l9 7.5"></path>
-          <path d="M5.5 9.5V21h13V9.5"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-house" aria-hidden="true"></i>
       `,
       explore: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="8"></circle>
-          <path d="M12 8.2v3.8l2.8 2.1"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-compass" aria-hidden="true"></i>
       `,
       search: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="6"></circle>
-          <path d="m20 20-4.2-4.2"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
       `,
       notifications: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 4.5a4.5 4.5 0 0 1 4.5 4.5v2.2c0 .92.24 1.82.7 2.61l1 1.72c.34.59-.08 1.3-.76 1.3H6.56c-.68 0-1.1-.71-.76-1.3l1-1.72c.46-.79.7-1.69.7-2.61V9A4.5 4.5 0 0 1 12 4.5Z"></path>
-          <path d="M10.3 18.5a1.9 1.9 0 0 0 3.4 0"></path>
-        </svg>
+        <i class="app-icon fa-regular fa-bell" aria-hidden="true"></i>
       `,
       create: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v14"></path>
-          <path d="M5 12h14"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-plus" aria-hidden="true"></i>
       `,
       profile: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M20 21a8 8 0 0 0-16 0"></path>
-          <circle cx="12" cy="8" r="4"></circle>
-        </svg>
+        <i class="app-icon fa-regular fa-user" aria-hidden="true"></i>
       `,
       settings: `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="3.1"></circle>
-          <path d="M19 12a7 7 0 0 0-.07-.99l2.11-1.65-2-3.46-2.54 1a7.24 7.24 0 0 0-1.71-.99l-.38-2.69h-4l-.38 2.69a7.24 7.24 0 0 0-1.71.99l-2.54-1-2 3.46 2.11 1.65A7 7 0 0 0 5 12c0 .34.02.67.07.99L2.96 14.64l2 3.46 2.54-1c.52.41 1.1.74 1.71.99l.38 2.69h4l.38-2.69c.61-.25 1.19-.58 1.71-.99l2.54 1 2-3.46-2.11-1.65c.05-.32.07-.65.07-.99Z"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-gear" aria-hidden="true"></i>
       `,
     };
 
@@ -326,7 +312,7 @@
 
     return `
       <li>
-        <a class="desktop-nav__link ${activeClass}" href="${link.href}"${modalAttr}${notificationsAttr}>
+        <a class="desktop-nav__link ${activeClass}" href="${link.href}"${modalAttr}${notificationsAttr}${activeClass ? ' aria-current="page"' : ""}>
           <span class="desktop-nav__icon desktop-nav__icon--${link.id}">${renderIcon(link.id)}${unreadMarker}</span>
           <span class="desktop-nav__label">${link.label}</span>
         </a>
@@ -343,15 +329,148 @@
       link.id === "notifications"
         ? '<span class="nav-unread-dot" id="mobile-notifications-dot" hidden aria-hidden="true"></span>'
         : "";
-    const labelHtml = isCreate ? "" : `<span class="bottom-nav__label">${link.label}</span>`;
+    const labelHtml = isCreate
+      ? ""
+      : link.id === "notifications"
+      ? '<span class="bottom-nav__label"><span class="bottom-nav__label-long">Notifications</span><span class="bottom-nav__label-short">Alerts</span></span>'
+      : `<span class="bottom-nav__label">${link.label}</span>`;
     return `
-      <a class="bottom-nav__link ${activeClass}${createClass}" href="${link.href}"${modalAttr} aria-label="${link.label}">
+      <a class="bottom-nav__link ${activeClass}${createClass}" href="${link.href}"${modalAttr}${activeClass ? ' aria-current="page"' : ""} aria-label="${link.label}">
         <span class="bottom-nav__icon bottom-nav__icon--${link.id}" aria-hidden="true">${renderIcon(link.id)}${unreadMarker}</span>
         ${labelHtml}
       </a>
     `;
   }
   let activeNotificationsSubscription = null;
+
+  function getSeenNotificationIds(userId) {
+    if (seenNotificationIdsByUser.has(userId)) return seenNotificationIdsByUser.get(userId);
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(`${NOTIFICATION_SEEN_PREFIX}${userId}`) || "null");
+      const ids = Array.isArray(stored) ? stored.filter((id) => typeof id === "string") : null;
+      if (ids) seenNotificationIdsByUser.set(userId, ids);
+      return ids;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function saveSeenNotificationIds(userId, ids) {
+    const seen = [...new Set(ids)].slice(0, 50);
+    seenNotificationIdsByUser.set(userId, seen);
+    try {
+      sessionStorage.setItem(`${NOTIFICATION_SEEN_PREFIX}${userId}`, JSON.stringify(seen));
+    } catch (_) {}
+  }
+
+  function dismissNotificationBanner() {
+    window.clearTimeout(notificationBannerTimer);
+    const banner = document.getElementById("notification-banner");
+    if (banner) banner.remove();
+  }
+
+  function showNotificationBanner(item, count) {
+    if (document.hidden || document.body.classList.contains("has-onboarding-open") ||
+      (window.ClashlyPush && window.ClashlyPush.isActiveOnThisDevice())) return;
+    dismissNotificationBanner();
+    const banner = document.createElement("div");
+    banner.id = "notification-banner";
+    banner.className = "notification-banner";
+    banner.setAttribute("role", "status");
+    banner.setAttribute("aria-live", "polite");
+
+    const icon = document.createElement("span");
+    icon.className = "notification-banner__icon";
+    icon.setAttribute("aria-hidden", "true");
+    const iconClass = {
+      follow: "fa-user-plus", comment: "fa-comment", reply: "fa-reply",
+      bookmark: "fa-bookmark", comment_like: "fa-heart",
+    }[item.type] || "fa-bell";
+    icon.innerHTML = `<i class="app-icon fa-solid ${iconClass}" aria-hidden="true"></i>`;
+
+    const link = document.createElement("a");
+    link.className = "notification-banner__link";
+    try {
+      const target = new URL(item.href || "notifications.html", window.location.href);
+      link.href = target.origin === window.location.origin ? target.href : "notifications.html";
+    } catch (_) {
+      link.href = "notifications.html";
+    }
+    const heading = document.createElement("span");
+    heading.className = "notification-banner__heading";
+    heading.textContent = count > 1 ? `${count} new notifications` : "New notification";
+    const message = document.createElement("span");
+    message.className = "notification-banner__message";
+    message.textContent = item.message || "You have a new notification.";
+    link.append(heading, message);
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "notification-banner__close";
+    close.setAttribute("aria-label", "Dismiss notification banner");
+    close.innerHTML = '<i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>';
+    close.addEventListener("click", dismissNotificationBanner);
+    banner.append(icon, link, close);
+    const scheduleDismiss = () => {
+      window.clearTimeout(notificationBannerTimer);
+      notificationBannerTimer = window.setTimeout(dismissNotificationBanner, 6500);
+    };
+    banner.addEventListener("pointerenter", () => window.clearTimeout(notificationBannerTimer));
+    banner.addEventListener("pointerleave", scheduleDismiss);
+    banner.addEventListener("focusin", () => window.clearTimeout(notificationBannerTimer));
+    banner.addEventListener("focusout", () => {
+      window.setTimeout(() => {
+        if (!banner.contains(document.activeElement)) scheduleDismiss();
+      }, 0);
+    });
+    document.body.appendChild(banner);
+    scheduleDismiss();
+  }
+
+  async function refreshNotificationBanners(userId) {
+    if (!userId || !window.ClashlyNotifications || document.hidden) return;
+    if (notificationRefreshPromise) return notificationRefreshPromise;
+    const refresh = (async () => {
+      const result = await window.ClashlyNotifications.fetchNotifications(userId, { limit: 25, fresh: true });
+      if (result.error || notificationWatcherUserId !== userId) return;
+      const items = result.notifications || [];
+      const previousIds = getSeenNotificationIds(userId);
+      const previousSet = new Set(previousIds || []);
+      const newItems = previousIds === null ? [] : items.filter((item) => !item.is_read && !previousSet.has(String(item.id)));
+      saveSeenNotificationIds(userId, items.map((item) => String(item.id)).concat(previousIds || []));
+      if (page !== "notifications") updateNavNotificationBadges(items.some((item) => !item.is_read));
+      if (newItems.length) showNotificationBanner(newItems[0], newItems.length);
+    })().catch(() => {}).finally(() => {
+      if (notificationRefreshPromise === refresh) notificationRefreshPromise = null;
+    });
+    notificationRefreshPromise = refresh;
+    return refresh;
+  }
+
+  function stopNotificationWatcher() {
+    if (notificationWatcherTimer) window.clearInterval(notificationWatcherTimer);
+    notificationWatcherTimer = null;
+    if (activeNotificationsSubscription && window.ClashlySupabase) {
+      const client = window.ClashlySupabase.getClient();
+      if (client && typeof client.removeChannel === "function") client.removeChannel(activeNotificationsSubscription);
+    }
+    activeNotificationsSubscription = null;
+    notificationWatcherUserId = "";
+    notificationRefreshPromise = null;
+    dismissNotificationBanner();
+  }
+
+  function startNotificationWatcher(userId) {
+    if (notificationWatcherUserId === userId) return;
+    stopNotificationWatcher();
+    notificationWatcherUserId = userId;
+    Promise.resolve(refreshNotificationBanners(userId)).finally(() => {
+      if (notificationWatcherUserId === userId) initRealtimeNotifications(userId);
+    });
+    notificationWatcherTimer = window.setInterval(() => {
+      if (!document.hidden) refreshNotificationBanners(userId);
+    }, 30000);
+  }
 
   function updateNavNotificationBadges(hasUnread) {
     const desktopDot = document.getElementById("desktop-notifications-dot");
@@ -403,6 +522,7 @@
             if (page !== "notifications") {
               updateNavNotificationBadges(true);
             }
+            refreshNotificationBanners(userId);
           }
         )
         .subscribe();
@@ -417,7 +537,8 @@
       <div class="top-nav__inner">
         <a class="brand" href="index.html" aria-label="Clashe home">
           <span class="brand__mark" aria-hidden="true">
-            <img src="assets/clashly-mark.svg" alt="" />
+            <img src="assets/Lightmode_logo.svg" alt="Clashe" class="theme-logo theme-logo--light" />
+            <img src="assets/Darkmode_logo.svg" alt="Clashe" class="theme-logo theme-logo--dark" />
           </span>
           <span>Clashe</span>
         </a>
@@ -433,12 +554,20 @@
   function buildBottomNav() {
     if (!bottomNavEl) return;
     bottomNavEl.innerHTML = `
-      <div class="bottom-nav__inner">
-        <span class="bottom-nav__active-pill" aria-hidden="true"></span>
-        ${mobileLinks.map(buildMobileLink).join("")}
+      <div class="bottom-nav__frame">
+        <div class="bottom-nav__inner">
+          <span class="bottom-nav__active-pill" aria-hidden="true"></span>
+          ${mobileLinks.filter((link) => link.id !== "create").map(buildMobileLink).join("")}
+        </div>
+        ${mobileLinks.filter((link) => link.id === "create").map(buildMobileLink).join("")}
       </div>
     `;
     positionBottomNavPill();
+    if (typeof ResizeObserver === "function") {
+      if (bottomNavResizeObserver) bottomNavResizeObserver.disconnect();
+      bottomNavResizeObserver = new ResizeObserver(positionBottomNavPill);
+      bottomNavResizeObserver.observe(bottomNavEl.querySelector(".bottom-nav__frame"));
+    }
     bindBottomNavTapFeedback();
     // A safety re-measure one frame later, in case web fonts finish
     // loading and shift the nav's layout right after this first paint.
@@ -457,6 +586,11 @@
     const activeLink = bottomNavEl.querySelector(".bottom-nav__link.is-active:not(.bottom-nav__link--create)");
     if (!inner || !pill) return;
 
+    const dockHeight = bottomNavEl.querySelector(".bottom-nav__frame").getBoundingClientRect().height;
+    if (dockHeight > 0) {
+      document.documentElement.style.setProperty("--mobile-nav-clearance", `${Math.ceil(dockHeight) + 24}px`);
+    }
+
     if (!activeLink) {
       pill.style.width = "0";
       return;
@@ -464,7 +598,7 @@
 
     const innerRect = inner.getBoundingClientRect();
     const linkRect = activeLink.getBoundingClientRect();
-    const offsetX = linkRect.left - innerRect.left;
+    const offsetX = linkRect.left - innerRect.left - inner.clientLeft;
     pill.style.width = `${linkRect.width}px`;
     pill.style.transform = `translateX(${offsetX}px)`;
   }
@@ -487,6 +621,10 @@
       },
       { passive: true }
     );
+
+    bottomNavEl.addEventListener("pointercancel", () => {
+      bottomNavEl.querySelectorAll(".bottom-nav__link.is-pressed").forEach((link) => link.classList.remove("is-pressed"));
+    });
 
     bottomNavEl.addEventListener("pointerup", () => {
       bottomNavEl.querySelectorAll(".bottom-nav__link.is-pressed").forEach((link) => {
@@ -534,6 +672,7 @@
     if (!window.ClashlyAuth) return;
 
     try {
+      if (window.ClashlyPush) await window.ClashlyPush.disable().catch(() => {});
       const { error } = await window.ClashlyAuth.signOut();
       if (error) {
         console.error("[Clashly] Logout failed.", error);
@@ -723,6 +862,8 @@
     setLogoutVisibility(Boolean(user));
 
     if (!user) {
+      stopNotificationWatcher();
+      notificationsUserId = "";
       onboardingShownForUserId = "";
       closeOnboardingModal({ markSeen: false });
       updateNavNotificationBadges(false);
@@ -730,8 +871,9 @@
     }
 
     maybeShowOnboarding(user.id).catch(() => {});
+    notificationsUserId = user.id;
     checkNavNotifications(user.id).catch(() => {});
-    initRealtimeNotifications(user.id);
+    startNotificationWatcher(user.id);
   }
 
   function bindLogoutActions() {
@@ -754,7 +896,7 @@
               <p class="composer-subtitle">Keep it sharp.</p>
             </div>
             <button type="button" class="modal-close-btn composer-modal__close" data-close-create-modal="true" aria-label="Close composer">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
           </header>
 
@@ -785,16 +927,12 @@
                 >
                   <span class="category-picker-trigger__content">
                     <span class="category-picker-trigger__icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 7h16M4 12h16M4 17h10"></path>
-                      </svg>
+                      <i class="app-icon fa-solid fa-list" aria-hidden="true"></i>
                     </span>
                     <span class="category-picker-trigger__text is-placeholder" id="create-modal-category-trigger-text">Select a category</span>
                   </span>
                   <span class="category-picker-trigger__chevron" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="m6 9 6 6 6-6"></path>
-                    </svg>
+                    <i class="app-icon fa-solid fa-chevron-down" aria-hidden="true"></i>
                   </span>
                 </button>
                 <p class="composer-hint">Choose one lane.</p>
@@ -804,11 +942,7 @@
                 <p class="field-label">Optional images</p>
                 <label for="create-modal-image" class="composer-upload">
                   <span class="composer-upload__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 5v9"></path>
-                      <path d="M8.5 8.5 12 5l3.5 3.5"></path>
-                      <path d="M5 15.5v1.75A1.75 1.75 0 0 0 6.75 19h10.5A1.75 1.75 0 0 0 19 17.25V15.5"></path>
-                    </svg>
+                    <i class="app-icon fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i>
                   </span>
                   <span class="composer-upload__copy">
                     <strong>Add images</strong>
@@ -884,7 +1018,7 @@
           <header class="notifications-drawer__head">
             <h2 id="notifications-drawer-title" class="notifications-drawer__title">Notifications</h2>
             <button type="button" class="notifications-drawer__close" aria-label="Close notifications" data-close-notifications-drawer="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
           </header>
           <p id="notifications-drawer-state" class="feed-state" hidden></p>
@@ -1432,7 +1566,7 @@
       // Tapping the tab you are already on scrolls smoothly to top instead of reloading the page
       if (link.classList.contains("is-active")) {
         event.preventDefault();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
         return;
       }
 
@@ -1460,12 +1594,12 @@
     window.addEventListener("clashly:notifications-read", () => updateNavNotificationBadges(false));
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden && notificationsUserId) {
-        checkNavNotifications(notificationsUserId).catch(() => {});
+        refreshNotificationBanners(notificationsUserId);
       }
     });
     window.addEventListener("focus", () => {
       if (notificationsUserId) {
-        checkNavNotifications(notificationsUserId).catch(() => {});
+        refreshNotificationBanners(notificationsUserId);
       }
     });
 

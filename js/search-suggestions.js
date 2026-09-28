@@ -85,10 +85,7 @@
     return `
       <a class="search-suggestions__item search-suggestions__item--query" href="search.html?q=${encodeURIComponent(safeQuery)}">
         <span class="search-suggestions__query-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="6"></circle>
-            <path d="m20 20-4.2-4.2"></path>
-          </svg>
+          <i class="app-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
         </span>
         <div class="search-suggestions__content">
           <strong class="search-suggestions__title">Search for &ldquo;${window.ClashlyUtils.escapeHtml(safeQuery)}&rdquo;</strong>
@@ -192,10 +189,7 @@
             (term) => `
               <a class="search-suggestions__item search-suggestions__item--recent" href="search.html?q=${encodeURIComponent(term)}">
                 <span class="search-suggestions__recent-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 8v4l2.8 2"></path>
-                    <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
-                  </svg>
+                  <i class="app-icon fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
                 </span>
                 <div class="search-suggestions__content">
                   <strong class="search-suggestions__title">${window.ClashlyUtils.escapeHtml(term)}</strong>

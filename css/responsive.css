@@ -11,7 +11,7 @@
   .app-main {
     width: 100%;
     max-width: 100%;
-    padding: 0 0 calc(84px + env(safe-area-inset-bottom));
+    padding: 0 0 calc(var(--mobile-nav-clearance, 96px) + env(safe-area-inset-bottom));
   }
 
   .app-main--home,
@@ -116,15 +116,13 @@
   .profile-feed:not(.profile-feed--grid) .take-item__media,
   .take-item__media {
     margin-top: 10px;
-    max-height: min(460px, 58vh);
-    max-width: 100% !important;
+    max-width: 100%;
   }
 
   .feed-stream .take-item__media--split,
   .profile-feed:not(.profile-feed--grid) .take-item__media--split,
   .take-item__media--split {
-    aspect-ratio: 16 / 10;
-    max-height: min(340px, 46vh);
+    aspect-ratio: 4 / 3;
   }
 
   /* Actions */
@@ -180,10 +178,11 @@
     display: none;
   }
 
-  .take-action--comments .take-action__icon svg {
+  .take-action--comments .take-action__icon .app-icon {
     width: 21px;
     height: 21px;
-  }
+  font-size: 21px;
+}
 
   .take-action--judge {
     min-width: 70px;
@@ -327,10 +326,11 @@
     gap: 7px;
   }
 
-  .comment-action--like .comment-action__icon svg {
+  .comment-action--like .comment-action__icon .app-icon {
     width: var(--comment-like-icon-size);
     height: var(--comment-like-icon-size);
-  }
+  font-size: var(--comment-like-icon-size);
+}
 
   .comment-action--like .comment-action__count {
     font-size: 0.84rem;
@@ -343,10 +343,11 @@
     gap: 7px;
   }
 
-  .comment-action--icon-plain .comment-action__icon svg {
+  .comment-action--icon-plain .comment-action__icon .app-icon {
     width: 20px;
     height: 20px;
-  }
+  font-size: 20px;
+}
 
   /* Create / Compose */
   .composer-modal__dialog {
@@ -439,37 +440,6 @@
     gap: 8px;
   }
 
-  /* Bottom nav */
-  .bottom-nav {
-    padding: 0 var(--space-3) calc(16px + env(safe-area-inset-bottom));
-  }
-
-  .bottom-nav__inner {
-    max-width: min(390px, 100%);
-    padding: 5px 6px;
-    border-radius: 20px;
-  }
-
-  .bottom-nav__link {
-    min-height: 48px;
-    border-radius: 13px;
-    padding: 4px 2px 5px;
-  }
-
-  .bottom-nav__active-pill {
-    border-radius: 13px;
-  }
-
-  .bottom-nav__link--create {
-    min-height: 44px;
-    min-width: 44px;
-    width: 44px;
-    height: 44px;
-    border-radius: 13px;
-    transform: translateY(-4px);
-    padding: 0;
-  }
-
   /* Auth on mobile */
   .auth-main {
     padding: var(--space-3);
@@ -549,11 +519,12 @@
 
   /* Comfortable profile stat sizing */
   .profile-stat strong {
-    font-size: 1.18rem;
+    font-size: 1.08rem;
   }
 
   .profile-stat span {
-    font-size: 0.78rem;
+    font-size: 0.68rem;
+    line-height: 1.15;
   }
 }
 
@@ -567,7 +538,7 @@
   .app-main {
     width: min(100%, 860px);
     margin: 0 auto;
-    padding: var(--space-3) var(--space-3) calc(84px + env(safe-area-inset-bottom));
+    padding: var(--space-3) var(--space-3) calc(var(--mobile-nav-clearance, 96px) + env(safe-area-inset-bottom));
   }
 
   .feed-column,
@@ -701,11 +672,11 @@
     margin-right: 12px;
   }
 
-  .desktop-nav__icon svg {
+  .desktop-nav__icon .app-icon {
     width: 20px;
     height: 20px;
-    stroke-width: 2;
-  }
+  font-size: 20px;
+}
 
   .bottom-nav {
     display: none;
@@ -720,9 +691,12 @@
     padding-bottom: var(--space-7);
   }
 
-  .app-main--narrow,
-  .app-main--take {
+  .app-main--narrow {
     max-width: calc(var(--max-width-narrow) + (var(--space-4) * 2));
+  }
+
+  .app-main--take {
+    max-width: none;
   }
 
   body[data-page="settings"] .app-main--narrow {
@@ -803,7 +777,8 @@
 /* ── Wide: 1200px + ────────────────────────────────────────── */
 
 @media (min-width: 1200px) {
-  .app-main--home {
+  .app-main--home,
+  .app-main--take {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 300px;
     gap: var(--space-5);

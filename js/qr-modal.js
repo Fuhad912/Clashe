@@ -54,7 +54,7 @@
               <h2 id="profile-qr-title" class="profile-qr-modal__title">Profile QR</h2>
             </div>
             <button type="button" class="modal-close-btn" data-close-qr-modal="true" aria-label="Close QR code modal">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
           </header>
 
@@ -70,18 +70,11 @@
 
             <div class="profile-qr-modal__actions">
               <button type="button" class="btn btn--solid profile-qr-modal__btn-download" id="profile-qr-download">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
+                <i class="app-icon fa-solid fa-download" aria-hidden="true"></i>
                 Download PNG
               </button>
               <button type="button" class="btn profile-qr-modal__btn-copy" id="profile-qr-copy">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <rect x="9" y="9" width="10" height="10" rx="2"/>
-                  <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/>
-                </svg>
+                <i class="app-icon fa-solid fa-copy" aria-hidden="true"></i>
                 Copy link
               </button>
             </div>

@@ -166,9 +166,10 @@ body[data-page="home"] .feed-head__inner {
   -webkit-tap-highlight-color: transparent;
 }
 
-.home-head__utility svg {
+.home-head__utility .app-icon {
   width: 18px;
   height: 18px;
+  font-size: 18px;
 }
 
 .home-head__utility:hover {
@@ -475,6 +476,24 @@ body[data-page="home"] .feed-head__inner {
   flex-shrink: 0;
 }
 
+.take-pinned-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.take-pinned-header .app-icon {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  transform: rotate(-30deg);
+}
+
 .take-owner-badge {
   display: inline-flex;
   align-items: center;
@@ -550,12 +569,8 @@ body[data-page="home"] .feed-head__inner {
 }
 
 /* ── Media ─────────────────────────────────────────────────── */
-/* Adaptive bounded media sizing (Bluesky / Threads / modern X style):
-   - Single image: 16:9 initial placeholder ratio before load, then smoothly adapts
-     to the photo's true ratio clamped safely between 4:5 (portrait) and 16:9 (landscape).
-     max-height: min(520px, 68vh) ensures tall photos never dominate the screen.
-   - Two images (split view): 16:9 unified grid container with 50/50 slots and 100% height,
-     ensuring both sides of the clash align side-by-side with identical heights. */
+/* A photo fills a predictable frame. The frame never derives its height from
+   the image's intrinsic dimensions, so portrait and panorama uploads align. */
 
 .take-item__media {
   margin-top: 12px;
@@ -563,40 +578,41 @@ body[data-page="home"] .feed-head__inner {
   border-radius: var(--radius-2);
   overflow: hidden;
   background: var(--color-surface-soft);
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
   width: 100%;
   max-width: 100%;
-  max-height: min(700px, 80vh);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   position: relative;
   transition: border-color var(--transition-fast);
 }
 
+.take-item__media[data-media-shape="portrait"] { aspect-ratio: 4 / 5; }
+.take-item__media[data-media-shape="square"] { aspect-ratio: 1 / 1; }
+.take-item__media[data-media-shape="landscape"] { aspect-ratio: 3 / 2; }
+.take-item__media[data-media-shape="wide"] { aspect-ratio: 16 / 9; }
+
 .take-item__media img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  max-height: inherit;
   object-fit: cover;
   object-position: center;
   display: block;
 }
 
+.take-item__media[data-media-shape="portrait"] > img { object-position: center 40%; }
+
 .take-item__media--split {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  aspect-ratio: 16 / 9;
-  max-height: min(440px, 58vh);
+  grid-template-rows: minmax(0, 1fr);
+  aspect-ratio: 3 / 2;
 }
 
 .take-item__media--split .take-item__media-slot {
   min-width: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 0;
   background: var(--color-surface-soft);
   position: relative;
   overflow: hidden;
@@ -607,6 +623,8 @@ body[data-page="home"] .feed-head__inner {
 }
 
 .take-item__media--split .take-item__media-slot img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -713,14 +731,10 @@ body[data-page="home"] .feed-head__inner {
   -webkit-tap-highlight-color: transparent;
 }
 
-.take-action svg {
+.take-action .app-icon {
   width: 22px;
   height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.25;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  font-size: 22px;
 }
 
 .take-action[disabled] {
@@ -746,6 +760,30 @@ body[data-page="home"] .feed-head__inner {
   color: var(--color-text-muted);
 }
 
+.take-action--pin {
+  min-width: 44px;
+  padding: 0 10px;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast), transform var(--transition-fast);
+}
+
+.take-action--pin:hover {
+  color: var(--color-text);
+}
+
+.take-action--pin.is-pinned {
+  color: var(--color-text);
+}
+
+.take-action--pin.is-pinned .app-icon {
+  transform: rotate(-30deg);
+}
+
+.take-action--pin[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .take-action--judge {
   min-width: 78px;
   padding: 0 10px;
@@ -766,9 +804,10 @@ body[data-page="home"] .feed-head__inner {
   color: color-mix(in srgb, var(--color-text) 70%, #6d7dff 30%);
 }
 
-.take-action--judge .take-action__icon svg {
+.take-action--judge .take-action__icon .app-icon {
   width: 15px;
   height: 15px;
+  font-size: 15px;
 }
 
 .take-action--judge:hover {
@@ -933,11 +972,6 @@ body[data-page="home"] .feed-head__inner {
   color: var(--color-text);
 }
 
-.take-action--bookmark.is-selected .take-action__icon svg {
-  fill: currentColor;
-  stroke: currentColor;
-}
-
 .take-action--delete {
   color: var(--color-disagree);
 }
@@ -949,19 +983,13 @@ body[data-page="home"] .feed-head__inner {
 
 /* ── Share icon — forward-arrow style ──────────────────────── */
 
-/* Swap the SVG markup in your HTML templates to use this path:
-   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-     <polyline points="13 5 20 12 13 19"/>
-     <path d="M4 12h15"/>
-     <rect x="1" y="3" width="22" height="18" rx="3"/>
-   </svg>
-   Or use the icon-share-forward glyph from your icon library.      */
 
-.take-action--share .take-action__icon svg,
-.take-item__share-mobile svg {
+
+.take-action--share .take-action__icon .app-icon,
+.take-item__share-mobile .app-icon {
   width: 22px;
   height: 22px;
+  font-size: 22px;
 }
 
 /* ── Vote bar ──────────────────────────────────────────────── */
@@ -1022,6 +1050,124 @@ body[data-page="home"] .feed-head__inner {
 .take-ai-judge__pick {
   margin-top: 6px;
   color: var(--color-text-muted);
+}
+
+/* ── Take AI Judge Countdown Indicator ─────────────────────── */
+
+.take-judge-countdown {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-1);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  transition: border-color var(--transition-base), background var(--transition-base);
+}
+
+.take-judge-countdown:hover {
+  background: var(--color-hover);
+  border-color: var(--color-border-strong);
+}
+
+.take-judge-countdown__lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.take-judge-countdown__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.take-judge-countdown__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: #6d7dff;
+}
+
+.take-judge-countdown__icon .app-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  font-size: 14px;
+}
+
+.take-judge-countdown__label {
+  font-size: 0.77rem;
+  font-weight: 550;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.take-judge-countdown__pct {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6d7dff;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.take-judge-countdown__track {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-vote-track);
+  overflow: hidden;
+  position: relative;
+}
+
+.take-judge-countdown__fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, #6d7dff, #8b5cf6);
+  transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Side needed variant */
+.take-judge-countdown--side-needed {
+  background: var(--color-surface-muted);
+}
+
+.take-judge-countdown--side-needed .take-judge-countdown__icon {
+  color: var(--color-text-muted);
+}
+
+.take-judge-countdown--side-needed .take-judge-countdown__label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 480px) {
+  .take-judge-countdown {
+    padding: 7px 10px;
+    gap: 5px;
+  }
+
+  .take-judge-countdown__label {
+    font-size: 0.73rem;
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .take-judge-countdown__pct {
+    font-size: 0.7rem;
+  }
 }
 
 /* ── Profile grid takes ─────────────────────────────────────── */
@@ -1117,14 +1263,10 @@ body[data-page="home"] .feed-head__inner {
   transition: background var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-.profile-grid-take__delete svg {
+.profile-grid-take__delete .app-icon {
   width: 15px;
   height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  font-size: 15px;
 }
 
 .profile-grid-take__delete:hover {
@@ -1134,6 +1276,110 @@ body[data-page="home"] .feed-head__inner {
 .profile-grid-take__delete[disabled] {
   opacity: 0.56;
   cursor: not-allowed;
+}
+
+.profile-grid-take__pinned-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.profile-grid-take__pinned-badge .app-icon {
+  font-size: 0.68rem;
+  transform: rotate(-30deg);
+}
+
+.profile-grid-take__pin {
+  position: absolute;
+  top: 8px;
+  right: 44px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.56);
+  transition: background var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.profile-grid-take__pin .app-icon {
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
+.profile-grid-take__pin:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.profile-grid-take__pin.is-pinned {
+  background: var(--color-surface, #18181b);
+  color: var(--color-text, #ffffff);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.profile-grid-take__pin.is-pinned .app-icon {
+  transform: rotate(-30deg);
+}
+
+.profile-grid-take__pin[disabled] {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.profile-grid-take:not(:has(.profile-grid-take__delete)) .profile-grid-take__pin {
+  right: 8px;
+}
+
+@media (max-width: 480px) {
+  .profile-grid-take__delete,
+  .profile-grid-take__pin {
+    width: 26px;
+    height: 26px;
+    top: 6px;
+  }
+  .profile-grid-take__delete {
+    right: 6px;
+  }
+  .profile-grid-take__pin {
+    right: 36px;
+  }
+  .profile-grid-take:not(:has(.profile-grid-take__delete)) .profile-grid-take__pin {
+    right: 6px;
+  }
+  .profile-grid-take__delete .app-icon,
+  .profile-grid-take__pin .app-icon {
+    font-size: 11px;
+    width: 11px;
+    height: 11px;
+  }
+  .profile-grid-take__pinned-badge {
+    top: 6px;
+    left: 6px;
+    padding: 2px 6px;
+    font-size: 0.6rem;
+  }
+  .profile-grid-take__pinned-badge .app-icon {
+    font-size: 0.6rem;
+  }
 }
 
 .profile-grid-take__user {
@@ -1152,3 +1398,157 @@ body[data-page="home"] .feed-head__inner {
 .profile-grid-vote--disagree {
   color: var(--color-disagree);
 }
+
+/* =========================================================
+   Take More — Bottom Sheet Modal
+   ========================================================= */
+
+.take-more-modal {
+  display: flex;
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.take-more-modal[hidden] {
+  display: none;
+}
+
+.take-more-modal.is-open {
+  pointer-events: auto;
+}
+
+.take-more-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+  cursor: pointer;
+}
+
+.take-more-modal.is-open .take-more-modal__backdrop {
+  opacity: 1;
+}
+
+.take-more-modal__sheet {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 540px;
+  background: var(--color-surface);
+  border-radius: 18px 18px 0 0;
+  padding: 0 0 env(safe-area-inset-bottom, 8px);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+  overflow: hidden;
+}
+
+.take-more-modal.is-open .take-more-modal__sheet {
+  transform: translateY(0);
+}
+
+.take-more-modal__handle-bar {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 4px;
+}
+
+.take-more-modal__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--color-border);
+}
+
+.take-more-modal__header {
+  padding: 4px 20px 8px;
+}
+
+.take-more-modal__actions {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+}
+
+.take-more-modal__item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.take-more-modal__item:hover,
+.take-more-modal__item:focus-visible {
+  background: var(--color-hover);
+  outline: none;
+}
+
+.take-more-modal__item--danger {
+  color: var(--color-danger, #e53e3e);
+}
+
+.take-more-modal__item--danger .take-more-modal__item-icon {
+  color: var(--color-danger, #e53e3e);
+}
+
+.take-more-modal__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-surface-alt, var(--color-hover));
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.take-more-modal__item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.take-more-modal__item-title {
+  font-size: 0.97rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.take-more-modal__footer {
+  padding: 6px 12px 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.take-more-modal__cancel-btn {
+  width: 100%;
+  padding: 13px 20px;
+  border: none;
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-hover);
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.take-more-modal__cancel-btn:hover,
+.take-more-modal__cancel-btn:focus-visible {
+  background: var(--color-border);
+  outline: none;
+}
+

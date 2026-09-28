@@ -241,7 +241,7 @@
   justify-content: center;
 }
 
-.comments-drawer__new-pill-icon svg {
+.comments-drawer__new-pill-icon .app-icon {
   display: block;
 }
 
@@ -285,14 +285,10 @@
   color: var(--color-text);
 }
 
-.comments-sort__icon svg {
+.comments-sort__icon .app-icon {
   width: 18px;
   height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  font-size: 18px;
 }
 
 .comments-sort__label {
@@ -621,15 +617,11 @@
     line-height: 1;
   }
 
-  .comments-drawer__body .comment-action--like .comment-action__icon svg {
+  .comments-drawer__body .comment-action--like .comment-action__icon .app-icon {
     width: var(--comment-like-icon-size);
     height: var(--comment-like-icon-size);
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2.25;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
+  font-size: var(--comment-like-icon-size);
+}
 
   .comments-drawer__body .comment-action--like .comment-action__count {
     display: inline-flex;
@@ -647,10 +639,6 @@
 
   .comments-drawer__body .comment-action--like.is-active {
     color: #dc2626;
-  }
-
-  .comments-drawer__body .comment-action--like.is-active .comment-action__icon svg {
-    fill: currentColor;
   }
 
   .comments-drawer__body .comment-action--like.is-active:hover {
@@ -681,15 +669,11 @@
     line-height: 1;
   }
 
-  .comments-drawer__body .comment-action--icon-plain .comment-action__icon svg {
+  .comments-drawer__body .comment-action--icon-plain .comment-action__icon .app-icon {
     width: 22px;
     height: 22px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
+  font-size: 22px;
+}
 
   .comments-drawer__body .comment-action--icon-plain:hover {
     color: #b91c1c;

@@ -21,7 +21,7 @@
   overflow: auto;
   transform: translate(-50%, -50%);
   border: var(--line);
-  border-radius: 16px;
+  border-radius: 28px;
   background: var(--color-surface);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
 }
@@ -169,20 +169,27 @@
 }
 
 .share-actions {
+  display: grid;
+  gap: 18px;
+  padding: 18px 20px 24px;
+}
+
+.share-destinations {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 8px 20px 24px;
-  overflow-x: visible;
+  gap: 14px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  padding: 4px 2px 12px;
 }
 
 .share-action {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -190,116 +197,113 @@
   text-decoration: none;
   font: inherit;
   cursor: pointer;
-  flex: 0 0 64px;
+  flex: 0 0 68px;
+  scroll-snap-align: start;
 }
 
-.share-action__orb {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+/* Shared destination tiles for take and profile sharing. */
+.share-action__orb,
+.profile-share-action__orb {
+  --share-ink: var(--color-text);
+  width: 58px;
+  height: 58px;
+  border-radius: 19px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-surface-soft);
-  color: var(--color-text);
-  border: var(--line);
   position: relative;
-  overflow: hidden;
-  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.18s ease;
+  flex: 0 0 auto;
+  color: var(--share-ink);
+  background: color-mix(in srgb, var(--share-ink) 7%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--share-ink) 10%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: background 160ms ease, transform 160ms ease;
 }
 
-.share-action__orb svg {
-  width: 22px;
-  height: 22px;
+.share-action__orb .app-icon,
+.profile-share-action__orb .app-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 29px;
+}
+
+:is(.share-action__orb--whatsapp, .profile-share-action__orb--whatsapp) { --share-ink: #168d48; }
+:root[data-theme="dark"] :is(.share-action__orb--whatsapp, .profile-share-action__orb--whatsapp) { --share-ink: #52d584; }
+:is(.share-action__orb--telegram, .profile-share-action__orb--telegram) { --share-ink: #1688be; }
+:root[data-theme="dark"] :is(.share-action__orb--telegram, .profile-share-action__orb--telegram) { --share-ink: #58baf0; }
+:is(.share-action__orb--instagram, .profile-share-action__orb--instagram) { --share-ink: #cd2879; }
+:root[data-theme="dark"] :is(.share-action__orb--instagram, .profile-share-action__orb--instagram) { --share-ink: #f178b0; }
+:is(.share-action__orb--reddit, .profile-share-action__orb--reddit) { --share-ink: #df430e; }
+:root[data-theme="dark"] :is(.share-action__orb--reddit, .profile-share-action__orb--reddit) { --share-ink: #ff8d64; }
+:is(.share-action__orb--facebook, .profile-share-action__orb--facebook) { --share-ink: #0866ff; }
+:root[data-theme="dark"] :is(.share-action__orb--facebook, .profile-share-action__orb--facebook) { --share-ink: #75aaff; }
+
+:is(.share-action__orb--instagram, .profile-share-action__orb--instagram) .app-icon::before {
+  background: linear-gradient(35deg, #e89424, #dc2b75 45%, #9145d2);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-theme="dark"] :is(.share-action__orb--instagram, .profile-share-action__orb--instagram) .app-icon::before {
+  background-image: linear-gradient(35deg, #ffc06e, #ff73ad 45%, #ba94ff);
+}
+
+.share-action:hover .share-action__orb,
+.profile-share-action:hover .profile-share-action__orb {
+  background: color-mix(in srgb, var(--share-ink) 12%, var(--color-surface));
+  transform: translateY(-2px);
+}
+
+.share-action:active .share-action__orb,
+.profile-share-action:active .profile-share-action__orb { transform: scale(0.96); }
+
+.share-action:focus-visible,
+.profile-share-action:focus-visible { outline: none; }
+
+.share-action:focus-visible .share-action__orb,
+.profile-share-action:focus-visible .profile-share-action__orb {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+.share-action__label,
+.profile-share-action__label {
   display: block;
-  flex-shrink: 0;
-}
-
-.share-action__orb--x {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #ffffff;
-  background: #0f1419;
-}
-
-:root[data-theme="dark"] .share-action__orb--x {
-  background: #181c20;
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-}
-
-.share-action__orb--whatsapp {
-  border: 0;
-  color: #ffffff;
-  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
-  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.24);
-}
-
-.share-action__orb--telegram {
-  border: 0;
-  color: #ffffff;
-  background: linear-gradient(135deg, #2aabee 0%, #229ed9 100%);
-  box-shadow: 0 4px 12px rgba(42, 171, 238, 0.24);
-}
-
-.share-action__orb--instagram {
-  border: 0;
-  color: #ffffff;
-  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
-  box-shadow: 0 4px 12px rgba(214, 36, 159, 0.24);
-}
-
-.share-action__orb--reddit {
-  border: 0;
-  color: #ffffff;
-  background: linear-gradient(135deg, #ff5700 0%, #ff4500 100%);
-  box-shadow: 0 4px 12px rgba(255, 69, 0, 0.24);
-}
-
-.share-action__orb--facebook {
-  border: 0;
-  color: #ffffff;
-  background: linear-gradient(135deg, #1877f2 0%, #0d65d9 100%);
-  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.24);
-}
-
-.share-action__orb--copy {
-  border: var(--line);
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--color-text);
+  line-height: 1.3;
+  text-align: center;
+}
+
+.share-action--utility {
+  flex-direction: row;
+  justify-content: center;
+  min-height: 50px;
+  padding: 10px 16px;
+  border-radius: 16px;
   background: var(--color-surface-soft);
 }
 
-.share-action:hover .share-action__orb {
-  transform: translateY(-2.5px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-  filter: brightness(1.04);
+.share-action--utility .share-action__orb {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-:root[data-theme="dark"] .share-action:hover .share-action__orb {
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.38);
-}
-
-.share-action:focus-visible {
-  outline: none;
-}
-
-.share-action:focus-visible .share-action__orb {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
-
-.share-action__label {
-  display: block;
-  font-size: 0.72rem;
-  font-weight: 550;
-  color: var(--color-text-muted);
-  line-height: 1.2;
-  text-align: center;
-  transition: color var(--transition-fast);
-}
-
-.share-action:hover .share-action__label {
-  color: var(--color-text);
-}
+.share-action--utility .app-icon { font-size: 18px; }
+.share-action--utility .share-action__label { font-size: 0.875rem; font-weight: 600; }
+.share-action--utility:hover { background: var(--color-hover); }
+.share-action--utility:hover .share-action__orb { background: transparent; transform: none; }
+.share-action--utility:focus-visible { outline: 2px solid var(--color-text); outline-offset: 3px; }
+.share-action--utility:focus-visible .share-action__orb { outline: none; }
 
 :root[data-theme="dark"] .share-modal__backdrop {
   background: rgba(0, 0, 0, 0.45);
@@ -323,35 +327,51 @@
 }
 
 @media (max-width: 640px) {
-  .share-modal__panel {
+  .share-modal__panel,
+  .profile-share-modal__panel {
     left: 50%;
     right: auto;
-    top: 50%;
-    bottom: auto;
-    width: min(100% - 24px, 560px);
-    max-height: min(90dvh, 760px);
-    transform: translate(-50%, -50%);
-    border: var(--line);
-    border-radius: 16px;
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: calc(100% - 16px);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    border-radius: 28px;
+    overscroll-behavior-y: contain;
   }
 
-  .share-actions {
-    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    gap: 10px;
+  .profile-share-modal__panel { transform: translateX(-50%) translateY(16px); }
+  .profile-share-modal.is-open .profile-share-modal__panel { transform: translateX(-50%); }
+
+  .share-modal__panel::before,
+  .profile-share-modal__panel::before {
+    content: "";
+    display: block;
+    width: 34px;
+    height: 5px;
+    margin: 10px auto 0;
+    border-radius: 99px;
+    background: color-mix(in srgb, var(--color-text) 18%, transparent);
   }
 
-  .share-action {
-    flex: 0 0 58px;
-  }
+  .share-modal__head { padding-top: 14px; }
+  .share-actions { padding-bottom: 20px; }
+  .share-destinations { gap: 12px; }
+  .profile-share-actions { padding-top: 4px; gap: 14px; }
+}
 
-  .share-action__orb {
-    width: 48px;
-    height: 48px;
-    border-radius: 13px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .share-action__orb,
+  .profile-share-action__orb,
+  .profile-share-modal__panel { transition: none; }
+  .share-action:hover .share-action__orb,
+  .profile-share-action:hover .profile-share-action__orb,
+  .share-action:active .share-action__orb,
+  .profile-share-action:active .profile-share-action__orb { transform: none; }
+}
 
-  .share-action__orb svg {
-    width: 20px;
-    height: 20px;
-  }
+@media (forced-colors: active) {
+  .share-action__orb,
+  .profile-share-action__orb { border: 1px solid ButtonText; }
+  :root :is(.share-action__orb--instagram, .profile-share-action__orb--instagram) .app-icon::before { background: none; color: ButtonText; }
 }

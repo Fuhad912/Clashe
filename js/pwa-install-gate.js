@@ -122,7 +122,7 @@
         </div>
         <div class="clashe-pwa-bar__actions">
           <button type="button" class="clashe-pwa-bar__btn" id="clashe-pwa-bar-install">Install</button>
-          <button type="button" class="clashe-pwa-bar__close" id="clashe-pwa-bar-close" aria-label="Dismiss">✕</button>
+          <button type="button" class="clashe-pwa-bar__close" id="clashe-pwa-bar-close" aria-label="Dismiss"><i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i></button>
         </div>
       </div>
     `;

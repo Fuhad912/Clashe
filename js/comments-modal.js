@@ -57,7 +57,7 @@
               data-close-comments-drawer="true"
               aria-label="Close comments drawer"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
           </header>
 
@@ -73,11 +73,7 @@
                   <header class="comments-shell__head">
                     <label class="comments-sort comments-sort--compact" aria-label="Sort comments">
                       <span class="comments-sort__icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" focusable="false">
-                          <path d="M4.75 6.5h14.5"></path>
-                          <path d="M7.5 12h9"></path>
-                          <path d="M10.25 17.5h3.5"></path>
-                        </svg>
+                        <i class="app-icon fa-solid fa-arrow-down-wide-short" aria-hidden="true"></i>
                       </span>
                       <span class="comments-sort__label">Sort comments</span>
                       <select id="comments-drawer-sort">
@@ -87,7 +83,7 @@
                     </label>
                     <button type="button" id="comments-drawer-new-pill" class="comments-drawer__new-pill" hidden aria-live="polite">
                       <span class="comments-drawer__new-pill-icon" aria-hidden="true">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                        <i class="app-icon fa-solid fa-arrow-up" aria-hidden="true"></i>
                       </span>
                       <span id="comments-drawer-new-pill-text">1 new comment</span>
                     </button>
@@ -355,7 +351,18 @@
     const likedByMe = Boolean(targetComment.liked_by_me);
     const likeCount = Math.max(0, Number(targetComment.like_count || 0));
     const likeLabel = likedByMe ? "Unlike comment" : "Like comment";
+    const wasLiked = likeButton.getAttribute("data-liked") === "true";
     likeButton.classList.toggle("is-active", likedByMe);
+    const icon = likeButton.querySelector(".comment-action__icon .app-icon");
+    if (icon) {
+      icon.classList.toggle("fa-solid", likedByMe);
+      icon.classList.toggle("fa-regular", !likedByMe);
+    }
+    if (wasLiked !== likedByMe) {
+      likeButton.classList.remove("is-motion-enter", "is-motion-exit");
+      void likeButton.offsetWidth;
+      likeButton.classList.add(likedByMe ? "is-motion-enter" : "is-motion-exit");
+    }
     likeButton.setAttribute("data-liked", likedByMe ? "true" : "false");
     likeButton.setAttribute("aria-pressed", likedByMe ? "true" : "false");
     likeButton.setAttribute("aria-label", likeLabel);

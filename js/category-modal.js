@@ -267,19 +267,13 @@
             <p class="category-modal__subtitle">Every take belongs to one lane. Choose where this clash lives.</p>
           </div>
           <button type="button" class="modal-close-btn category-modal__close" data-close-modal="true" aria-label="Close category selector">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 6 6 18"></path>
-              <path d="m6 6 12 12"></path>
-            </svg>
+            <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
           </button>
         </header>
 
         <div class="category-modal__search-wrap">
           <span class="category-modal__search-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="7"></circle>
-              <path d="m21 21-4.35-4.35"></path>
-            </svg>
+            <i class="app-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
           </span>
           <input
             type="text"
@@ -299,11 +293,7 @@
           <div class="category-modal__grid" id="category-modal-grid" role="listbox" aria-label="Available categories"></div>
           <div class="category-modal__empty" id="category-modal-empty" hidden>
             <div class="category-modal__empty-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <path d="m21 21-4.3-4.3"></path>
-                <path d="M8 11h6"></path>
-              </svg>
+              <i class="app-icon fa-solid fa-magnifying-glass" aria-hidden="true"></i>
             </div>
             <p class="category-modal__empty-title">No categories found</p>
             <p class="category-modal__empty-text" id="category-empty-text">No lanes match your search.</p>
@@ -440,9 +430,7 @@
               <span class="category-item__name">${escapeHtml(cat.name)}</span>
               <span class="category-item__slug">/${escapeHtml(cat.slug)}</span>
               <span class="category-item__check" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 6 9 17l-5-5"></path>
-                </svg>
+                <i class="app-icon fa-solid fa-check" aria-hidden="true"></i>
               </span>
             </div>
             <p class="category-item__desc">${escapeHtml(cat.description || "Category lane")}</p>

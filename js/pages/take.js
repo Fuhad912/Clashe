@@ -18,6 +18,7 @@
   function getAiJudgeElements() {
     return {
       trigger: document.getElementById("ai-judge-trigger"),
+      countdown: document.getElementById("ai-judge-countdown"),
       status: document.getElementById("ai-judge-status"),
       loading: document.getElementById("ai-judge-loading"),
       result: document.getElementById("ai-judge-result"),
@@ -165,6 +166,110 @@
     };
   }
 
+  function updateAiJudgeCountdown() {
+    const { countdown } = getAiJudgeElements();
+    if (!countdown || !currentTake) return;
+
+    const takeForJudge = {
+      ...currentTake,
+      comment_count: typeof currentCommentsCount === "number" ? currentCommentsCount : currentTake.comment_count,
+    };
+
+    const aiJudgeService = window.ClashlyAiJudge || window.ClasheAiJudge;
+    if (!aiJudgeService || typeof aiJudgeService.getJudgeEligibilityProgress !== "function") {
+      countdown.hidden = true;
+      countdown.innerHTML = "";
+      return;
+    }
+
+    const progress = aiJudgeService.getJudgeEligibilityProgress(takeForJudge);
+    if (!progress || progress.alreadyJudged) {
+      countdown.hidden = true;
+      countdown.innerHTML = "";
+      return;
+    }
+
+    if (progress.hasBothSides && progress.isEligible) {
+      countdown.hidden = true;
+      countdown.innerHTML = "";
+      return;
+    }
+
+    // Minimum engagement: at least 3 votes OR at least 1 comment
+    const hasEngagement = progress.voteCount >= 3 || progress.commentCount >= 1;
+    if (!hasEngagement) {
+      countdown.hidden = false;
+      countdown.innerHTML = `
+        <p class="ai-judge__note">AI Judge unlocks once this debate gathers 20+ votes and 6+ comments.</p>
+      `;
+      return;
+    }
+
+    if (!progress.hasBothSides) {
+      const voteStats = getTakeVoteStats();
+      const agreeCount = Number(voteStats.agreeVotes || 0);
+      const disagreeCount = Number(voteStats.disagreeVotes || 0);
+      const breakdown = agreeCount > 0 && disagreeCount === 0
+        ? `Currently ${agreeCount} Agree vs 0 Disagree.`
+        : disagreeCount > 0 && agreeCount === 0
+          ? `Currently 0 Agree vs ${disagreeCount} Disagree.`
+          : `Currently ${agreeCount} Agree vs ${disagreeCount} Disagree.`;
+
+      countdown.hidden = false;
+      countdown.innerHTML = `
+        <div class="ai-judge-progress-card ai-judge-progress-card--side-needed">
+          <div class="ai-judge-progress-card__header">
+            <div class="ai-judge-progress-card__title-wrap">
+              <span class="ai-judge-progress-card__icon" aria-hidden="true">
+                <i class="app-icon fa-solid fa-scale-balanced" aria-hidden="true"></i>
+              </span>
+              <span class="ai-judge-progress-card__title">Votes needed from both sides</span>
+            </div>
+          </div>
+          <p class="ai-judge-progress-card__callout">Needs votes from both sides before AI Judge can weigh in.</p>
+          <p class="ai-judge-progress-card__subtext">${breakdown} Both sides of the argument must be represented for the judge to analyze fairly.</p>
+        </div>
+      `;
+      return;
+    }
+
+    const missingParts = [];
+    if (progress.missingVotes > 0) {
+      missingParts.push(`${progress.missingVotes} ${progress.missingVotes === 1 ? "vote" : "votes"}`);
+    }
+    if (progress.missingComments > 0) {
+      missingParts.push(`${progress.missingComments} ${progress.missingComments === 1 ? "comment" : "comments"}`);
+    }
+    const callout = `${missingParts.join(" + ")} until AI Judge verdict`;
+    const pct = Math.round(progress.overallProgress * 100);
+
+    countdown.hidden = false;
+    countdown.innerHTML = `
+      <div class="ai-judge-progress-card">
+        <div class="ai-judge-progress-card__header">
+          <div class="ai-judge-progress-card__title-wrap">
+            <span class="ai-judge-progress-card__icon" aria-hidden="true">
+              <i class="app-icon fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+            </span>
+            <span class="ai-judge-progress-card__title">${callout}</span>
+          </div>
+          <span class="ai-judge-progress-card__pct">${pct}%</span>
+        </div>
+        <div class="ai-judge-progress-card__track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+          <div class="ai-judge-progress-card__fill" style="width: ${pct}%"></div>
+        </div>
+        <div class="ai-judge-progress-card__stats">
+          <span class="ai-judge-progress-card__stat ${progress.missingVotes === 0 ? "is-met" : ""}">
+            <strong>${progress.voteCount}</strong> / ${progress.voteThreshold} votes ${progress.missingVotes === 0 ? '<i class="app-icon fa-solid fa-check" aria-hidden="true"></i> Met' : `(${progress.missingVotes} to go)`}
+          </span>
+          <span class="ai-judge-progress-card__stat ${progress.missingComments === 0 ? "is-met" : ""}">
+            <strong>${progress.commentCount}</strong> / ${progress.commentThreshold} comments ${progress.missingComments === 0 ? '<i class="app-icon fa-solid fa-check" aria-hidden="true"></i> Met' : `(${progress.missingComments} to go)`}
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
   function formatAiJudgeTimestamp(isoDate) {
     const safeIso = String(isoDate || "").trim();
     if (!safeIso) return "";
@@ -223,6 +328,12 @@
       ${picksMarkup ? `<section class="ai-judge__picks">${picksMarkup}</section>` : ""}
     `;
     resultEl.hidden = false;
+
+    const { countdown } = getAiJudgeElements();
+    if (countdown) {
+      countdown.hidden = true;
+      countdown.innerHTML = "";
+    }
   }
 
   function jumpToCommentById(commentId) {
@@ -566,6 +677,7 @@
       currentCommentsCount = result.count || 0;
       updateCommentsSummary();
       renderComments();
+      updateAiJudgeCountdown();
       setCommentsState("", "");
     } catch (error) {
       if (threadEl && currentComments.length === 0) {
@@ -633,7 +745,18 @@
     const likedByMe = Boolean(targetComment.liked_by_me);
     const likeCount = Math.max(0, Number(targetComment.like_count || 0));
     const likeLabel = likedByMe ? "Unlike comment" : "Like comment";
+    const wasLiked = likeButton.getAttribute("data-liked") === "true";
     likeButton.classList.toggle("is-active", likedByMe);
+    const icon = likeButton.querySelector(".comment-action__icon .app-icon");
+    if (icon) {
+      icon.classList.toggle("fa-solid", likedByMe);
+      icon.classList.toggle("fa-regular", !likedByMe);
+    }
+    if (wasLiked !== likedByMe) {
+      likeButton.classList.remove("is-motion-enter", "is-motion-exit");
+      void likeButton.offsetWidth;
+      likeButton.classList.add(likedByMe ? "is-motion-enter" : "is-motion-exit");
+    }
     likeButton.setAttribute("data-liked", likedByMe ? "true" : "false");
     likeButton.setAttribute("aria-pressed", likedByMe ? "true" : "false");
     likeButton.setAttribute("aria-label", likeLabel);
@@ -891,6 +1014,7 @@
       vote: optimisticVote || currentTake.vote,
     };
     syncCurrentTakeState();
+    updateAiJudgeCountdown();
 
     try {
       const voteResult = await window.ClashlyTakes.submitVote({
@@ -914,6 +1038,7 @@
         vote: reconciledVote || currentTake.vote,
       };
       syncCurrentTakeState();
+      updateAiJudgeCountdown();
       setAiJudgeStatus("", "");
       setTakeState("", "");
     } catch (error) {
@@ -923,6 +1048,7 @@
         vote: previousVote,
       };
       syncCurrentTakeState();
+      updateAiJudgeCountdown();
       throw error;
     }
   }
@@ -1047,6 +1173,7 @@
 
       setTakeState("", "");
       renderTake();
+      updateAiJudgeCountdown();
       if (!isSearchEntry) {
         setAiJudgeLoading(false);
         await loadComments();

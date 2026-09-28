@@ -38,9 +38,7 @@
     if (comment && comment.ai_judge_cited) {
       badges.push(
         '<span class="comment-item__badge comment-badge--ai-pick" role="status" aria-label="Cited as top argument by AI Judge" title="Cited as top argument by AI Judge">' +
-          '<svg class="comment-badge__icon" viewBox="0 0 16 16" width="10" height="10" fill="currentColor" aria-hidden="true">' +
-            '<path d="M8 1l2.1 4.3 4.7.7-3.4 3.3.8 4.7L8 11.8l-4.2 2.2.8-4.7L1.2 6l4.7-.7L8 1z"/>' +
-          '</svg>' +
+          '<i class="app-icon fa-solid fa-star comment-badge__icon" aria-hidden="true"></i>' +
           '<span>AI Pick</span>' +
         '</span>'
       );
@@ -100,21 +98,13 @@
 
   function renderDeleteIcon() {
     return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3.5 6.5h17"></path>
-        <path d="M9.2 6.5V4.7c0-.7.6-1.2 1.2-1.2h3.2c.7 0 1.2.6 1.2 1.2v1.8"></path>
-        <path d="M18.2 6.5 17.1 19a1.8 1.8 0 0 1-1.8 1.6H8.7A1.8 1.8 0 0 1 6.9 19L5.8 6.5"></path>
-        <path d="M10.2 10.1v6.2"></path>
-        <path d="M13.8 10.1v6.2"></path>
-      </svg>
+      <i class="app-icon fa-solid fa-trash-can" aria-hidden="true"></i>
     `;
   }
 
-  function renderLikeIcon() {
+  function renderLikeIcon(liked) {
     return `
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 20.6 4.9 13.8a4.7 4.7 0 0 1 0-6.8 5.1 5.1 0 0 1 7.1 0L12 7l.1-.1a5.1 5.1 0 0 1 7.1 0 4.7 4.7 0 0 1 0 6.8L12 20.6Z"></path>
-      </svg>
+      <i class="app-icon ${liked ? "fa-solid" : "fa-regular"} fa-heart" aria-hidden="true"></i>
     `;
   }
 
@@ -143,7 +133,7 @@
         aria-label="${likeLabel}"
         title="${likeLabel}"
       >
-        <span class="comment-action__icon" aria-hidden="true">${renderLikeIcon()}</span>
+        <span class="comment-action__icon" aria-hidden="true">${renderLikeIcon(likedByMe)}</span>
         <span class="comment-action__count">${window.ClashlyUtils.escapeHtml(likeCount.toLocaleString())}</span>
       </button>`,
     ];

@@ -162,11 +162,12 @@
   border-radius: 12px;
 }
 
-.profile-qr-modal__btn-download svg,
-.profile-qr-modal__btn-copy svg {
+.profile-qr-modal__btn-download .app-icon,
+.profile-qr-modal__btn-copy .app-icon {
   width: 16px;
   height: 16px;
   flex-shrink: 0;
+  font-size: 16px;
 }
 
 /* Dark mode */

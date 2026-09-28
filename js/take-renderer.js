@@ -1,4 +1,6 @@
 (function () {
+  const renderedTakesMap = new Map();
+
   function getVoteData(take) {
     const vote = take && take.vote ? take.vote : {};
     return {
@@ -44,7 +46,14 @@
       return take.image_urls.filter(Boolean).slice(0, 2);
     }
     if (take && take.image_url) {
-      return [String(take.image_url)];
+      const raw = String(take.image_url).trim();
+      if (raw.startsWith("[")) {
+        try {
+          const urls = JSON.parse(raw);
+          if (Array.isArray(urls)) return urls.filter((url) => typeof url === "string" && url.trim()).slice(0, 2);
+        } catch (_) {}
+      }
+      return raw ? [raw] : [];
     }
     return [];
   }
@@ -137,51 +146,98 @@
     `;
   }
 
-  function renderActionIcon(name) {
+  function renderTakeJudgeCountdown(take, options) {
+    if (options && options.hideTakeJudgeCountdown) return "";
+    const aiJudgeService = window.ClashlyAiJudge || window.ClasheAiJudge;
+    if (!aiJudgeService || typeof aiJudgeService.getJudgeEligibilityProgress !== "function") {
+      return "";
+    }
+
+    const progress = aiJudgeService.getJudgeEligibilityProgress(take);
+    if (!progress || progress.alreadyJudged) {
+      return "";
+    }
+
+    if (progress.hasBothSides && progress.isEligible) {
+      return "";
+    }
+
+    // Minimum engagement: at least 3 votes OR at least 1 comment
+    const hasEngagement = progress.voteCount >= 3 || progress.commentCount >= 1;
+    if (!hasEngagement) {
+      return "";
+    }
+
+    if (!progress.hasBothSides) {
+      return `
+        <div class="take-judge-countdown take-judge-countdown--side-needed" aria-label="AI Judge requirement">
+          <div class="take-judge-countdown__lead">
+            <div class="take-judge-countdown__left">
+              <span class="take-judge-countdown__icon" aria-hidden="true">${renderActionIcon("balance")}</span>
+              <span class="take-judge-countdown__label">Needs votes from both sides before AI Judge can weigh in</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    const missingParts = [];
+    if (progress.missingVotes > 0) {
+      missingParts.push(`${progress.missingVotes} ${progress.missingVotes === 1 ? "vote" : "votes"}`);
+    }
+    if (progress.missingComments > 0) {
+      missingParts.push(`${progress.missingComments} ${progress.missingComments === 1 ? "comment" : "comments"}`);
+    }
+    const label = `${missingParts.join(" + ")} until AI Judge verdict`;
+    const pct = Math.round(progress.overallProgress * 100);
+
+    return `
+      <div class="take-judge-countdown" aria-label="AI Judge progress: ${pct}%">
+        <div class="take-judge-countdown__lead">
+          <div class="take-judge-countdown__left">
+            <span class="take-judge-countdown__icon" aria-hidden="true">${renderActionIcon("judge")}</span>
+            <span class="take-judge-countdown__label">${window.ClashlyUtils.escapeHtml(label)}</span>
+          </div>
+          <span class="take-judge-countdown__pct">${pct}%</span>
+        </div>
+        <div class="take-judge-countdown__track" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+          <div class="take-judge-countdown__fill" style="width: ${pct}%"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderActionIcon(name, selected = false) {
     const icons = {
       agree: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M10 10.25h4.15l1.22-4.3c.17-.58.53-1.08 1.01-1.41l.86-.59 1.06 1.16c.55.6.76 1.43.55 2.22l-.81 2.92H20a1.8 1.8 0 0 1 1.78 2.09l-.95 6.08A1.8 1.8 0 0 1 19.05 20H10V10.25Z"></path>
-          <path d="M5.25 10.25H8.9V20H5.25z"></path>
-        </svg>
+        <i class="app-icon ${selected ? "fa-solid" : "fa-regular"} fa-thumbs-up" aria-hidden="true"></i>
       `,
       disagree: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M14 13.75H9.85l-1.22 4.3c-.17.58-.53 1.08-1.01 1.41l-.86.59-1.06-1.16a2.26 2.26 0 0 1-.55-2.22l.81-2.92H4a1.8 1.8 0 0 1-1.78-2.09l.95-6.08A1.8 1.8 0 0 1 4.95 4H14v9.75Z"></path>
-          <path d="M15.1 4h3.65v9.75H15.1z"></path>
-        </svg>
+        <i class="app-icon ${selected ? "fa-solid" : "fa-regular"} fa-thumbs-down" aria-hidden="true"></i>
       `,
       comments: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 4.75c4.56 0 8.25 3.13 8.25 7 0 3.87-3.69 7-8.25 7-1.04 0-2.04-.16-2.96-.45l-3.54 1.58 1.08-3.06C5.28 15.58 3.75 13.79 3.75 11.75c0-3.87 3.69-7 8.25-7Z"></path>
-        </svg>
+        <i class="app-icon fa-regular fa-comment" aria-hidden="true"></i>
       `,
       bookmark: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7.1 4.75h9.8A1.35 1.35 0 0 1 18.25 6.1V20l-6.25-3.45L5.75 20V6.1A1.35 1.35 0 0 1 7.1 4.75Z"></path>
-        </svg>
+        <i class="app-icon ${selected ? "fa-solid" : "fa-regular"} fa-bookmark" aria-hidden="true"></i>
       `,
       share: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 15.7V4.6"></path>
-          <path d="m8.15 8.35 3.85-3.85 3.85 3.85"></path>
-          <path d="M6.35 10.9v7.1c0 .83.67 1.5 1.5 1.5h8.3c.83 0 1.5-.67 1.5-1.5v-7.1"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i>
       `,
       judge: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="m12 3.6 2.1 6.3 6.3 2.1-6.3 2.1-2.1 6.3-2.1-6.3-6.3-2.1 6.3-2.1z"></path>
-          <path d="m18.1 4.6.8 2.3 2.3.8-2.3.8-.8 2.3-.8-2.3-2.3-.8 2.3-.8z"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+      `,
+      balance: `
+        <i class="app-icon fa-solid fa-scale-balanced" aria-hidden="true"></i>
       `,
       delete: `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M3.8 6.5h16.4"></path>
-          <path d="M9.2 6.5V4.7a.95.95 0 0 1 .95-.95h3.7a.95.95 0 0 1 .95.95v1.8"></path>
-          <path d="M6.6 6.5v12.1a1.15 1.15 0 0 0 1.15 1.15h8.5a1.15 1.15 0 0 0 1.15-1.15V6.5"></path>
-          <path d="M10 10.1v6.2"></path>
-          <path d="M14 10.1v6.2"></path>
-        </svg>
+        <i class="app-icon fa-solid fa-trash-can" aria-hidden="true"></i>
+      `,
+      pin: `
+        <i class="app-icon fa-solid fa-thumbtack" aria-hidden="true"></i>
+      `,
+      more: `
+        <i class="app-icon fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
       `,
     };
 
@@ -243,6 +299,8 @@
     const showAiJudgeAction = Boolean(options && options.showAiJudgeAction);
     const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
     const canDeleteTake = Boolean(options && options.showDeleteAction && currentUserId && take && take.user_id === currentUserId);
+    const canPinTake = Boolean(options && options.showPinAction && currentUserId && take && take.user_id === currentUserId);
+    const isPinned = Boolean(take && take.is_pinned);
     const judgeAction = showAiJudgeAction
       ? `<button
           type="button"
@@ -257,6 +315,20 @@
             <span class="take-action__icon take-action__icon--judge">${renderActionIcon("judge")}</span>
             <span>Judge</span>
           </span>
+        </button>`
+      : "";
+    const pinAction = canPinTake
+      ? `<button
+          type="button"
+          class="take-action take-action--pin${isPinned ? " is-pinned" : ""}"
+          data-action="pin-take"
+          data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
+          data-pinned="${isPinned ? "true" : "false"}"
+          ${take && take.pin_loading ? "disabled" : ""}
+          aria-label="${isPinned ? "Unpin take" : "Pin take to profile"}"
+          title="${isPinned ? "Unpin take" : "Pin take to profile"}"
+        >
+          <span class="take-action__icon">${renderActionIcon("pin", isPinned)}</span>
         </button>`
       : "";
     const deleteAction = canDeleteTake
@@ -279,10 +351,11 @@
         data-action="bookmark"
         data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
         data-bookmarked="${take && take.bookmarked ? "true" : "false"}"
+        aria-pressed="${take && take.bookmarked ? "true" : "false"}"
         aria-label="${bookmarkLabel} take"
         title="${bookmarkLabel} take"
       >
-        <span class="take-action__icon">${renderActionIcon("bookmark")}</span>
+        <span class="take-action__icon">${renderActionIcon("bookmark", Boolean(take && take.bookmarked))}</span>
       </button>
     `;
 
@@ -297,10 +370,11 @@
               data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
               data-vote-type="agree"
               aria-label="Agree with take"
+              aria-pressed="${voteData.userVote === "agree" ? "true" : "false"}"
               ${loadingAttr}
             >
               <span class="take-action__stack">
-                <span class="take-action__icon">${renderActionIcon("agree")}</span>
+                <span class="take-action__icon">${renderActionIcon("agree", voteData.userVote === "agree")}</span>
                 <span class="take-action__label">Agree</span>
                 <span class="take-action__count">${voteData.agreeCount}</span>
               </span>
@@ -312,16 +386,18 @@
               data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
               data-vote-type="disagree"
               aria-label="Disagree with take"
+              aria-pressed="${voteData.userVote === "disagree" ? "true" : "false"}"
               ${loadingAttr}
             >
               <span class="take-action__stack">
-                <span class="take-action__icon">${renderActionIcon("disagree")}</span>
+                <span class="take-action__icon">${renderActionIcon("disagree", voteData.userVote === "disagree")}</span>
                 <span class="take-action__label">Disagree</span>
                 <span class="take-action__count">${voteData.disagreeCount}</span>
               </span>
             </button>
             ${commentsAction}
             ${shareAction}
+            ${pinAction}
             ${deleteAction}
           </div>
           <div class="take-item__actions-side" aria-label="Secondary take actions">
@@ -331,6 +407,7 @@
         </div>
         ${renderVoteSplit(voteData)}
         ${renderVoteMeta(voteData)}
+        ${renderTakeJudgeCountdown(take, options)}
         ${renderInlineAiJudgeResult(take, options)}
       </footer>
     `;
@@ -360,10 +437,30 @@
           >${options.isExpanded ? "Close" : "Open"}</button>`
         : `<a href="${takeHref}" class="take-item__open">Open</a>`
       : "";
-    const mobileShareAction =
-      options && options.hideShareAction
-        ? ""
-        : `
+    if (take && take.id) {
+      renderedTakesMap.set(take.id, take);
+    }
+    const showMoreAction = Boolean(
+      options && (options.showMoreAction || options.showPinAction || options.showDeleteAction)
+    );
+    const headerAction = showMoreAction
+      ? `
+      <button
+        type="button"
+        class="take-action take-item__more-btn"
+        data-action="take-more"
+        data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
+        data-take-user-id="${window.ClashlyUtils.escapeHtml(take.user_id || "")}"
+        data-take-is-pinned="${take.is_pinned ? "1" : "0"}"
+        aria-label="More options"
+        title="More options"
+      >
+        <span class="take-action__icon">${renderActionIcon("more")}</span>
+      </button>
+    `
+      : options && options.hideShareAction
+      ? ""
+      : `
       <button
         type="button"
         class="take-action take-action--share take-item__share-mobile"
@@ -394,13 +491,12 @@
             ${imageUrls
               .map(
                 (imageUrl, index) => `
-                  <div class="take-item__media-slot" data-media-shape="pending">
+                  <div class="take-item__media-slot">
                     <img
                       src="${window.ClashlyUtils.escapeHtml(imageUrl)}"
                       alt="Take image ${index + 1} from ${window.ClashlyUtils.escapeHtml(username)}"
                       loading="lazy"
                       decoding="async"
-                      onload="window.ClashlyTakeRenderer.applyImageAspectRatio(this)"
                     />
                   </div>
                 `
@@ -422,10 +518,19 @@
       ? `<p class="take-item__text">${renderTakeText(cleanContent)}</p>`
       : "";
 
+    const pinnedBadge =
+      take && take.is_pinned
+        ? `<div class="take-pinned-header">
+            <i class="app-icon fa-solid fa-thumbtack" aria-hidden="true"></i>
+            <span>Pinned take</span>
+          </div>`
+        : "";
+
     return `
       <article class="take-item${compactClass}${expandedClass}${toggleableClass}" data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}">
         ${avatarMarkup}
         <div class="take-item__body">
+          ${pinnedBadge}
           <header class="take-item__meta">
             <div class="take-item__meta-main">
               <a href="${profileHref}" class="take-item__user">${window.ClashlyUtils.escapeHtml(username)}</a>
@@ -436,7 +541,7 @@
               ${ownerBadge}
               ${openLink}
             </div>
-            ${mobileShareAction}
+            ${headerAction}
           </header>
           ${textMarkup}
           ${hashtagsMarkup}
@@ -448,6 +553,9 @@
   }
 
   function renderGridItem(take, options) {
+    if (take && take.id) {
+      renderedTakesMap.set(take.id, take);
+    }
     const username = getUsername(take.profile);
     const relativeTime = window.ClashlyUtils.formatRelativeTime(take.created_at);
     const voteData = getVoteData(take);
@@ -456,9 +564,12 @@
         ? window.ClashlyUtils.stripTrailingHashtags(take.content)
         : take.content;
     const excerpt = renderTakeText(cleanContent || take.content);
-    const hasImage = Boolean(take.image_url);
+    const imageUrls = getTakeImageUrls(take);
+    const hasImage = imageUrls.length > 0;
     const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
     const canDeleteTake = Boolean(options && options.showDeleteAction && currentUserId && take && take.user_id === currentUserId);
+    const canPinTake = Boolean(options && options.showPinAction && currentUserId && take && take.user_id === currentUserId);
+    const isPinned = Boolean(take && take.is_pinned);
     const userVoteLabel =
       voteData.userVote === "agree"
         ? `<span class="profile-grid-vote profile-grid-vote--agree">You agreed</span>`
@@ -469,7 +580,7 @@
       ? `
         <div class="profile-grid-take__media-wrap">
           <img class="profile-grid-take__media" src="${window.ClashlyUtils.escapeHtml(
-            take.image_url
+            imageUrls[0]
           )}" alt="Take image from ${window.ClashlyUtils.escapeHtml(username)}" loading="lazy" decoding="async" />
           <div class="profile-grid-take__overlay">
             <p class="profile-grid-take__excerpt">${excerpt}</p>
@@ -481,6 +592,26 @@
           <p class="profile-grid-take__excerpt">${excerpt}</p>
         </div>
       `;
+    const pinButton = canPinTake
+      ? `<button
+          type="button"
+          class="profile-grid-take__pin${isPinned ? " is-pinned" : ""}"
+          data-action="pin-take"
+          data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
+          data-pinned="${isPinned ? "true" : "false"}"
+          ${take && take.pin_loading ? "disabled" : ""}
+          aria-label="${isPinned ? "Unpin take" : "Pin take"}"
+          title="${isPinned ? "Unpin take" : "Pin take"}"
+        >
+          ${renderActionIcon("pin", isPinned)}
+        </button>`
+      : "";
+    const pinnedBadge = isPinned
+      ? `<span class="profile-grid-take__pinned-badge" title="Pinned take">
+          <i class="app-icon fa-solid fa-thumbtack" aria-hidden="true"></i>
+          <span>Pinned</span>
+        </span>`
+      : "";
     const deleteButton = canDeleteTake
       ? `<button
           type="button"
@@ -499,6 +630,8 @@
       <article class="profile-grid-take${hasImage ? " profile-grid-take--with-image" : " profile-grid-take--text-only"}" data-take-id="${window.ClashlyUtils.escapeHtml(
         take.id
       )}">
+        ${pinnedBadge}
+        ${pinButton}
         ${deleteButton}
         ${mediaMarkup}
         <div class="profile-grid-take__meta">
@@ -528,6 +661,8 @@
           hideShareAction: Boolean(safeOptions.hideShareAction),
           showAiJudgeAction: Boolean(safeOptions.showAiJudgeAction),
           showDeleteAction: Boolean(safeOptions.showDeleteAction),
+          showPinAction: Boolean(safeOptions.showPinAction),
+          showMoreAction: Boolean(safeOptions.showMoreAction),
           hideActionRow: Boolean(safeOptions.hideActionRow),
           hideInlineAiJudgeResult: Boolean(safeOptions.hideInlineAiJudgeResult),
           showOpenLink: Boolean(safeOptions.showOpenLink),
@@ -557,6 +692,8 @@
           hideShareAction: Boolean(safeOptions.hideShareAction),
           showAiJudgeAction: Boolean(safeOptions.showAiJudgeAction),
           showDeleteAction: Boolean(safeOptions.showDeleteAction),
+          showPinAction: Boolean(safeOptions.showPinAction),
+          showMoreAction: Boolean(safeOptions.showMoreAction),
           hideActionRow: Boolean(safeOptions.hideActionRow),
           hideInlineAiJudgeResult: Boolean(safeOptions.hideInlineAiJudgeResult),
           showOpenLink: Boolean(safeOptions.showOpenLink),
@@ -602,7 +739,15 @@
 
   function syncVoteButton(button, isSelected, count, isDisabled) {
     if (!(button instanceof HTMLElement)) return;
+    const wasSelected = button.classList.contains("is-selected");
     button.classList.toggle("is-selected", isSelected);
+    button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    const icon = button.querySelector(".take-action__icon .app-icon");
+    if (icon) {
+      icon.classList.toggle("fa-solid", isSelected);
+      icon.classList.toggle("fa-regular", !isSelected);
+    }
+    if (wasSelected !== isSelected) playActionMotion(button, isSelected ? "is-motion-enter" : "is-motion-exit");
     button.disabled = Boolean(isDisabled);
     const countEl = button.querySelector(".take-action__count");
     if (countEl) {
@@ -612,11 +757,26 @@
 
   function syncBookmarkButton(button, isBookmarked) {
     if (!(button instanceof HTMLElement)) return;
+    const wasBookmarked = button.classList.contains("is-selected");
     const bookmarkLabel = isBookmarked ? "Saved" : "Save";
     button.classList.toggle("is-selected", Boolean(isBookmarked));
+    button.setAttribute("aria-pressed", isBookmarked ? "true" : "false");
+    const icon = button.querySelector(".take-action__icon .app-icon");
+    if (icon) {
+      icon.classList.toggle("fa-solid", isBookmarked);
+      icon.classList.toggle("fa-regular", !isBookmarked);
+    }
+    if (wasBookmarked !== Boolean(isBookmarked)) playActionMotion(button, isBookmarked ? "is-motion-enter" : "is-motion-exit");
     button.setAttribute("data-bookmarked", isBookmarked ? "true" : "false");
     button.setAttribute("aria-label", `${bookmarkLabel} take`);
     button.setAttribute("title", `${bookmarkLabel} take`);
+  }
+
+  function playActionMotion(button, className) {
+    button.classList.remove("is-motion-enter", "is-motion-exit");
+    // Restart a rapid second tap without adding timers to every rendered take.
+    void button.offsetWidth;
+    button.classList.add(className);
   }
 
   function syncVoteMeta(item, voteData) {
@@ -640,6 +800,44 @@
     }
   }
 
+  function syncTakeJudgeCountdown(item, take) {
+    if (!item) return;
+    const actionsWrapper = item.querySelector(".take-item__actions-wrapper");
+    if (!actionsWrapper) return;
+
+    const existingCountdown = actionsWrapper.querySelector(".take-judge-countdown");
+    const newCountdownMarkup = renderTakeJudgeCountdown(take);
+
+    if (!newCountdownMarkup) {
+      if (existingCountdown) existingCountdown.remove();
+      return;
+    }
+
+    if (existingCountdown) {
+      const temp = document.createElement("div");
+      temp.innerHTML = newCountdownMarkup.trim();
+      const newEl = temp.firstElementChild;
+      if (newEl) {
+        existingCountdown.replaceWith(newEl);
+      }
+    } else {
+      const voteMeta = actionsWrapper.querySelector(".take-vote-meta");
+      const inlineJudge = actionsWrapper.querySelector(".take-ai-judge");
+      const temp = document.createElement("div");
+      temp.innerHTML = newCountdownMarkup.trim();
+      const newEl = temp.firstElementChild;
+      if (newEl) {
+        if (inlineJudge) {
+          actionsWrapper.insertBefore(newEl, inlineJudge);
+        } else if (voteMeta && voteMeta.nextSibling) {
+          actionsWrapper.insertBefore(newEl, voteMeta.nextSibling);
+        } else {
+          actionsWrapper.appendChild(newEl);
+        }
+      }
+    }
+  }
+
   function syncTakeState(rootEl, take) {
     if (!rootEl || !take || !take.id) return;
     const voteData = getVoteData(take);
@@ -654,6 +852,31 @@
       syncBookmarkButton(bookmarkButton, Boolean(take.bookmarked));
       syncVoteSplit(item, voteData);
       syncVoteMeta(item, voteData);
+      syncTakeJudgeCountdown(item, take);
+
+      if (typeof take.comment_count === "number") {
+        const commentButton = item.querySelector("[data-action='comments']");
+        if (commentButton) {
+          const count = Math.max(0, Number(take.comment_count) || 0);
+          const lead = commentButton.querySelector(".take-action__lead");
+          const label = count > 0 ? `Open comments (${count})` : "Open comments";
+          commentButton.setAttribute("aria-label", label);
+          commentButton.setAttribute("title", label);
+          if (lead) {
+            let countEl = lead.querySelector(".take-action__count--comments");
+            if (count > 0) {
+              if (!countEl) {
+                countEl = document.createElement("span");
+                countEl.className = "take-action__count take-action__count--comments";
+                lead.appendChild(countEl);
+              }
+              countEl.textContent = count.toLocaleString();
+            } else if (countEl) {
+              countEl.remove();
+            }
+          }
+        }
+      }
     });
   }
 
@@ -811,42 +1034,44 @@
     });
   }
 
+  function bindPinActions(rootEl, handlers) {
+    if (!rootEl || !handlers || typeof handlers.onPin !== "function") return;
+
+    const pinButtons = rootEl.querySelectorAll("[data-action='pin-take']");
+    pinButtons.forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+        const takeId = button.getAttribute("data-take-id");
+        const isPinned = button.getAttribute("data-pinned") === "true";
+        if (!takeId || button.disabled) return;
+
+        try {
+          await handlers.onPin({
+            takeId,
+            isPinned,
+          });
+        } catch (error) {
+          if (handlers.onStatus) {
+            handlers.onStatus(
+              window.ClashlyUtils.reportError("Pin take action failed.", error, "Could not update pinned take."),
+              "error"
+            );
+          }
+        }
+      });
+    });
+  }
+
   // Standard Social Media Media Sizing (Facebook, Instagram, X):
   // - Full width across the post section (100% width) - no side displacement or awkward gaps!
   // - Single image aspect ratio clamped between 4:5 (universal portrait bound, 0.8) and 16:9 (landscape bound, 1.7778).
-  // - Photos within 4:5 to 16:9 (including 1:1 square, 4:3, 3:2, 16:9) fill the full-width box with zero cropping!
-  // - Ultra-tall photos (taller than 4:5, like 9:16 vertical photos/screenshots) use object-fit: contain inside the 4:5 box
-  //   with a sleek surface background, exactly like Facebook and X, keeping the entire image 100% visible!
-  // - Two images (split view): 16:9 unified grid container with 50/50 slots and 100% height.
-  const SINGLE_IMAGE_MIN_RATIO = 4 / 5; // 0.8 (Instagram/Facebook/X standard portrait bound)
-  const SINGLE_IMAGE_MAX_RATIO = 16 / 9; // 1.7778 (landscape bound)
-
   function applyImageAspectRatio(imgEl) {
     if (!imgEl || !imgEl.naturalWidth || !imgEl.naturalHeight) return;
-    const container = imgEl.closest(".take-item__media, .take-item__media-slot");
+    const container = imgEl.closest(".take-item__media:not(.take-item__media--split)");
     if (!container) return;
-
-    const isSplit = container.classList.contains("take-item__media-slot");
-    const trueRatio = imgEl.naturalWidth / imgEl.naturalHeight;
-
-    if (isSplit) {
-      // In split view, the parent grid (.take-item__media--split) controls the overall ratio
-      // so both slots share equal height.
-      container.style.aspectRatio = "";
-    } else {
-      // Standard social media ratio clamping: 4:5 (portrait) to 16:9 (landscape)
-      const clampedRatio = Math.min(Math.max(trueRatio, SINGLE_IMAGE_MIN_RATIO), SINGLE_IMAGE_MAX_RATIO);
-      container.style.aspectRatio = String(Number(clampedRatio.toFixed(4)));
-    }
-
-    // Always span full 100% width of the post section - no shrinking or sticking to the right!
-    container.style.width = "100%";
-    container.style.maxWidth = "100%";
-
-    // Standard FB/X approach: if photo is taller than 4:5 (e.g. 9:16), use contain to keep 100% of the image visible!
-    // For standard photos (4:5 to 16:9), cover fills the matching aspect-ratio box without cropping.
-    imgEl.style.objectFit = trueRatio < 0.76 ? "contain" : "cover";
-    container.dataset.mediaShape = trueRatio > 1.05 ? "landscape" : trueRatio < 0.95 ? "portrait" : "square";
+    const ratio = imgEl.naturalWidth / imgEl.naturalHeight;
+    container.dataset.mediaShape = ratio < 0.92 ? "portrait" : ratio <= 1.12 ? "square" : ratio >= 1.65 ? "wide" : "landscape";
   }
 
   function hydrateCachedImages(rootEl) {
@@ -871,13 +1096,7 @@
       <div class="delete-take-modal__backdrop" data-close-delete-take="true"></div>
       <section class="delete-take-modal__panel" role="dialog" aria-modal="true" aria-labelledby="delete-take-title" aria-describedby="delete-take-desc">
         <div class="delete-take-modal__icon-wrap" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
-            <path d="M10 11v6"></path>
-            <path d="M14 11v6"></path>
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
-          </svg>
+          <i class="app-icon fa-solid fa-trash-can" aria-hidden="true"></i>
         </div>
         <h2 id="delete-take-title" class="delete-take-modal__title">Delete take?</h2>
         <p id="delete-take-desc" class="delete-take-modal__desc">Are you sure you want to delete this take? This action cannot be undone and will permanently remove your take and all its votes and comments.</p>
@@ -952,10 +1171,221 @@
     });
   }
 
+  let activeTakeMoreSheetCleanup = null;
+
+  function ensureTakeMoreModal() {
+    let modal = document.getElementById("take-more-modal");
+    if (modal) return modal;
+
+    modal = document.createElement("div");
+    modal.id = "take-more-modal";
+    modal.className = "take-more-modal";
+    modal.hidden = true;
+    modal.innerHTML = `
+      <div class="take-more-modal__backdrop" data-close-take-more="true"></div>
+      <section class="take-more-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="take-more-title">
+        <div class="take-more-modal__handle-bar" aria-hidden="true">
+          <span class="take-more-modal__handle"></span>
+        </div>
+        <div class="take-more-modal__header sr-only">
+          <h3 id="take-more-title">Take options</h3>
+        </div>
+        <div class="take-more-modal__actions" id="take-more-actions"></div>
+        <div class="take-more-modal__footer">
+          <button type="button" class="take-more-modal__cancel-btn" data-close-take-more="true">Cancel</button>
+        </div>
+      </section>
+    `;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  function closeTakeMoreSheet() {
+    const modal = document.getElementById("take-more-modal");
+    if (!modal || modal.hidden) return;
+
+    if (typeof activeTakeMoreSheetCleanup === "function") {
+      activeTakeMoreSheetCleanup();
+      activeTakeMoreSheetCleanup = null;
+    }
+
+    modal.classList.remove("is-open");
+    document.body.style.overflow = "";
+
+    window.setTimeout(() => {
+      if (!modal.classList.contains("is-open")) {
+        modal.hidden = true;
+      }
+    }, 240);
+  }
+
+  function openTakeMoreSheet(options) {
+    const modal = ensureTakeMoreModal();
+    if (!modal || !options || !options.take) return;
+
+    const take = options.take;
+    const canPin = Boolean(options.canPin);
+    const canDelete = Boolean(options.canDelete);
+    const isPinned = Boolean(options.isPinned);
+    const actionsContainer = modal.querySelector("#take-more-actions");
+    if (!actionsContainer) return;
+
+    let itemsHtml = "";
+
+    if (canPin) {
+      itemsHtml += `
+        <button type="button" class="take-more-modal__item" data-sheet-action="pin">
+          <span class="take-more-modal__item-icon take-more-modal__item-icon--pin">
+            ${renderActionIcon("pin", isPinned)}
+          </span>
+          <span class="take-more-modal__item-text">
+            <span class="take-more-modal__item-title">${isPinned ? "Unpin from profile" : "Pin to your profile"}</span>
+          </span>
+        </button>
+      `;
+    }
+
+    itemsHtml += `
+      <button type="button" class="take-more-modal__item" data-sheet-action="share">
+        <span class="take-more-modal__item-icon take-more-modal__item-icon--share">
+          ${renderActionIcon("share")}
+        </span>
+        <span class="take-more-modal__item-text">
+          <span class="take-more-modal__item-title">Share take</span>
+        </span>
+      </button>
+    `;
+
+    if (canDelete) {
+      itemsHtml += `
+        <button type="button" class="take-more-modal__item take-more-modal__item--danger" data-sheet-action="delete">
+          <span class="take-more-modal__item-icon take-more-modal__item-icon--danger">
+            ${renderActionIcon("delete")}
+          </span>
+          <span class="take-more-modal__item-text">
+            <span class="take-more-modal__item-title">Delete take</span>
+          </span>
+        </button>
+      `;
+    }
+
+    actionsContainer.innerHTML = itemsHtml;
+
+    if (typeof activeTakeMoreSheetCleanup === "function") {
+      activeTakeMoreSheetCleanup();
+    }
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeTakeMoreSheet();
+      }
+    }
+
+    function onClick(e) {
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+
+      const closeTrigger = target.closest("[data-close-take-more='true']");
+      if (closeTrigger) {
+        e.preventDefault();
+        closeTakeMoreSheet();
+        return;
+      }
+
+      const actionBtn = target.closest("[data-sheet-action]");
+      if (!actionBtn) return;
+
+      const action = actionBtn.getAttribute("data-sheet-action");
+      closeTakeMoreSheet();
+
+      if (action === "pin" && typeof options.onPin === "function") {
+        options.onPin({ takeId: take.id, isPinned });
+      } else if (action === "share") {
+        if (typeof options.onShare === "function") {
+          options.onShare({
+            takeId: take.id,
+            shareUrl: window.ClashlyUtils.toTakeUrl(take.id),
+            take,
+          });
+        } else if (window.ClashlyShareModal) {
+          window.ClashlyShareModal.open({ take });
+        }
+      } else if (action === "delete" && typeof options.onDelete === "function") {
+        options.onDelete({ takeId: take.id, take });
+      }
+    }
+
+    modal.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKeyDown);
+
+    activeTakeMoreSheetCleanup = () => {
+      modal.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+
+    modal.hidden = false;
+    document.body.style.overflow = "hidden";
+    window.requestAnimationFrame(() => {
+      modal.classList.add("is-open");
+    });
+  }
+
+  function bindTakeMoreActions(rootEl, handlers) {
+    if (!rootEl || !handlers) return;
+
+    rootEl.addEventListener("click", function onMoreClick(event) {
+      const button = event.target.closest("[data-action='take-more']");
+      if (!button) return;
+
+      event.stopPropagation();
+      event.preventDefault();
+
+      const takeId = button.getAttribute("data-take-id");
+      if (!takeId) return;
+
+      const takeUserId = button.getAttribute("data-take-user-id") || "";
+      const isPinned = button.getAttribute("data-take-is-pinned") === "1";
+
+      // Try to get the full take object; fall back to a minimal one
+      let take = null;
+      if (typeof handlers.getTake === "function") {
+        take = handlers.getTake(takeId);
+      }
+      if (!take) {
+        take = renderedTakesMap.get(takeId);
+      }
+      // If still not found, build a minimal take so the sheet still opens
+      if (!take) {
+        take = { id: takeId, user_id: takeUserId, is_pinned: isPinned };
+      }
+
+      const currentUserId = handlers.currentUserId ? String(handlers.currentUserId) : "";
+      const canPin = typeof handlers.canPin === "function"
+        ? Boolean(handlers.canPin(take))
+        : Boolean(currentUserId && takeUserId === currentUserId);
+      const canDelete = typeof handlers.canDelete === "function"
+        ? Boolean(handlers.canDelete(take))
+        : Boolean(currentUserId && takeUserId === currentUserId);
+
+      openTakeMoreSheet({
+        take,
+        canPin,
+        canDelete,
+        isPinned: take.is_pinned || isPinned,
+        onPin: handlers.onPin,
+        onShare: handlers.onShare,
+        onDelete: handlers.onDelete,
+        onStatus: handlers.onStatus,
+      });
+    });
+  }
+
   window.ClashlyTakeRenderer = {
     renderTakeList,
     appendTakeList,
     renderTakeGrid,
+    renderTakeJudgeCountdown,
     syncTakeState,
     bindShareActions,
     bindVoteActions,
@@ -963,6 +1393,10 @@
     bindBookmarkActions,
     bindAiJudgeActions,
     bindDeleteActions,
+    bindPinActions,
+    bindTakeMoreActions,
+    openTakeMoreSheet,
+    closeTakeMoreSheet,
     confirmDeleteTake,
     applyImageAspectRatio,
     hydrateCachedImages,

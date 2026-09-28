@@ -31,9 +31,10 @@
   border-radius: 999px;
 }
 
-.profile-head__settings-btn svg {
+.profile-head__settings-btn .app-icon {
   width: 20px;
   height: 20px;
+  font-size: 20px;
 }
 
 .profile-head__hero {
@@ -93,7 +94,7 @@
 
 .profile-head__meta {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -134,53 +135,14 @@
   letter-spacing: 0;
 }
 
-.profile-stat--top-arguments.has-citations strong {
-  color: var(--color-brand);
-  text-shadow: 0 0 10px color-mix(in srgb, var(--color-brand) 28%, transparent);
-}
-
-:root[data-theme="dark"] .profile-stat--top-arguments.has-citations strong {
-  color: var(--color-brand);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--color-brand) 38%, transparent);
-}
-
-.profile-stat--clashscore {
-  position: relative;
-}
-
-.profile-stat__number-group {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-}
-
-.clashscore-tier-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 4.5px;
-  border-radius: var(--radius-pill);
-  font-size: 0.52rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  line-height: 1.1;
-  user-select: none;
-  vertical-align: middle;
-  transition: all var(--transition-fast);
-}
-
-/* ── Profile Tier Progress Card ────────────────────────────── */
-
 .profile-tier-progress {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 18px 20px;
   border-radius: var(--radius-2);
-  background: color-mix(in srgb, var(--color-surface) 94%, var(--color-surface-soft));
+  background: var(--color-surface-soft);
   border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
-  box-shadow: var(--shadow-soft);
   margin-top: 4px;
 }
 
@@ -193,22 +155,24 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
   font-size: 0.76rem;
 }
 
 .profile-tier-progress__tier {
-  display: inline-flex;
+  display: flex;
+  flex-direction: row-reverse;
   align-items: center;
-  gap: 7px;
+  gap: 14px;
 }
 
 .profile-tier-progress__badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  padding: 5px 9px;
   border-radius: var(--radius-pill);
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -216,11 +180,17 @@
 }
 
 .profile-tier-progress__score-text {
+  display: grid;
+  gap: 5px;
   color: var(--color-text-muted);
   font-size: 0.74rem;
 }
 
 .profile-tier-progress__score-text strong {
+  font-size: clamp(1.6rem, 4vw, 2rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text);
   font-weight: 750;
 }
@@ -230,7 +200,7 @@
   font-weight: 600;
   color: var(--color-text-muted);
   letter-spacing: -0.01em;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .profile-tier-progress__status.is-max-tier {
@@ -284,11 +254,18 @@
 
 @media (max-width: 640px) {
   .profile-head__meta {
-    gap: 3px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .profile-stat {
+    min-height: 48px;
   }
 
   .profile-stat strong {
-    font-size: 1.08rem;
+    font-size: 1.05rem;
+    line-height: 1.1;
   }
 
   .profile-stat span {
@@ -296,19 +273,9 @@
     line-height: 1.15;
   }
 
-  .profile-stat__number-group {
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .clashscore-tier-badge {
-    font-size: 0.46rem;
-    padding: 0 3px;
-  }
-
   .profile-tier-progress {
-    padding: 8px 11px;
-    gap: 5px;
+    padding: 14px 16px;
+    gap: 12px;
   }
 
   .profile-tier-progress__header {
@@ -316,13 +283,19 @@
   }
 
   .profile-tier-progress__status {
-    font-size: 0.68rem;
+    font-size: 0.75rem;
   }
 }
 
 @media (max-width: 360px) {
   .profile-head__meta {
-    gap: 2px;
+    grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+    row-gap: 8px;
+    column-gap: 4px;
+  }
+
+  .profile-stat {
+    min-height: 44px;
   }
 
   .profile-stat strong {
@@ -330,8 +303,8 @@
   }
 
   .profile-stat span {
-    font-size: 0.62rem;
-    line-height: 1.1;
+    font-size: 0.7rem;
+    line-height: 1.12;
   }
 
   .profile-tier-progress {
@@ -672,6 +645,13 @@
 
 .profile-feed {
   display: block;
+}
+
+@media (min-width: 1025px) {
+  .profile-feed:not(.profile-feed--grid) {
+    width: min(100%, 760px);
+    margin-inline: auto;
+  }
 }
 
 .profile-feed--grid {
@@ -1104,89 +1084,6 @@
   flex: 0 0 64px;
 }
 
-.profile-share-action__orb {
-  width: 52px;
-  height: 52px;
-  border: var(--line);
-  border-radius: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-surface-soft);
-  color: var(--color-text);
-  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.18s ease;
-}
-
-.profile-share-action__orb svg {
-  width: 22px;
-  height: 22px;
-  display: block;
-}
-
-.profile-share-action__orb--instagram {
-  border: 0;
-  color: #fff;
-  background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285aeb 90%);
-  box-shadow: 0 4px 12px rgba(214, 36, 159, 0.24);
-}
-
-.profile-share-action__orb--whatsapp {
-  border: 0;
-  color: #fff;
-  background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
-  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.24);
-}
-
-.profile-share-action__orb--facebook {
-  border: 0;
-  color: #fff;
-  background: linear-gradient(135deg, #1877f2 0%, #0d65d9 100%);
-  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.24);
-}
-
-.profile-share-action__orb--x {
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #fff;
-  background: #0f1419;
-}
-
-.profile-share-action__orb--telegram {
-  border: 0;
-  color: #fff;
-  background: linear-gradient(135deg, #2aabee 0%, #229ed9 100%);
-  box-shadow: 0 4px 12px rgba(42, 171, 238, 0.24);
-}
-
-.profile-share-action__label {
-  display: block;
-  max-width: 64px;
-  font-size: 0.72rem;
-  font-weight: 550;
-  line-height: 1.2;
-  color: var(--color-text-muted);
-  text-align: center;
-  transition: color var(--transition-fast);
-}
-
-.profile-share-action:hover .profile-share-action__label {
-  color: var(--color-text);
-}
-
-.profile-share-action:hover .profile-share-action__orb {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-  filter: brightness(1.04);
-}
-
-.profile-share-action:focus-visible {
-  outline: none;
-}
-
-.profile-share-action:focus-visible .profile-share-action__orb {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 2px;
-}
-
 :root[data-theme="dark"] .profile-share-modal__backdrop {
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: none !important;
@@ -1195,12 +1092,6 @@
 
 :root[data-theme="dark"] .profile-share-preview {
   background: var(--color-surface-muted);
-}
-
-:root[data-theme="dark"] .profile-share-action__orb--x {
-  background: #181c20;
-  border-color: rgba(255, 255, 255, 0.14);
-  color: #fff;
 }
 
 @media (max-width: 640px) {

@@ -3,7 +3,7 @@
   const AVATAR_BUCKET = "avatars";
   const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
   const ALLOWED_GENDERS = ["female", "male", "non_binary", "prefer_not_to_say", "other"];
-  const PROFILE_SELECT_BASE = "id, username, bio, date_of_birth, gender, avatar_url, created_at, clashscore";
+  const PROFILE_SELECT_BASE = "id, username, bio, date_of_birth, gender, avatar_url, created_at, clashscore, pinned_take_id";
   const PROFILE_SELECT_WITH_ONBOARDING = `${PROFILE_SELECT_BASE}, onboarding_seen`;
   const PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
   const profileCacheById = new Map();
@@ -35,17 +35,39 @@
     return safe.slice(0, 2).toUpperCase();
   }
 
-  function isClashscoreColumnMissing(error) {
-    const code = String(error && error.code || "");
-    const message = String(error && error.message || "").toLowerCase();
-    return code === "42703" || (message.includes("clashscore") && message.includes("column"));
+  function isColumnMissingError(error) {
+    const code = String((error && error.code) || "");
+    const message = String((error && error.message) || "").toLowerCase();
+    return code === "42703" || message.includes("column") || message.includes("does not exist");
+  }
+
+  function readLocalPinnedTake(userId) {
+    if (!userId) return null;
+    try {
+      return localStorage.getItem(`clashly_pinned_take_${userId}`) || null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function writeLocalPinnedTake(userId, takeId) {
+    if (!userId) return;
+    try {
+      if (takeId) {
+        localStorage.setItem(`clashly_pinned_take_${userId}`, String(takeId));
+      } else {
+        localStorage.removeItem(`clashly_pinned_take_${userId}`);
+      }
+    } catch (_) {}
   }
 
   function normalizeProfileRow(profile) {
     if (!profile) return profile;
+    const localPinned = readLocalPinnedTake(profile.id);
     return {
       ...profile,
       clashscore: Math.max(0, Number(profile.clashscore || 0)),
+      pinned_take_id: profile.pinned_take_id || localPinned || null,
     };
   }
 
@@ -130,7 +152,7 @@
       .eq(column, value)
       .maybeSingle();
 
-    if (result.error && isClashscoreColumnMissing(result.error)) {
+    if (result.error && isColumnMissingError(result.error)) {
       result = await client
         .from(PROFILES_TABLE)
         .select(fallbackFields)
@@ -264,6 +286,45 @@
     return { error };
   }
 
+  async function setPinnedTake(userId, takeId) {
+    if (!userId) {
+      return { success: false, error: new Error("User ID is required.") };
+    }
+
+    const safeTakeId = takeId ? String(takeId).trim() : null;
+    writeLocalPinnedTake(userId, safeTakeId);
+
+    const cached = getCachedProfileById(userId);
+    if (cached) {
+      cached.pinned_take_id = safeTakeId;
+    }
+
+    try {
+      const client = getClientOrThrow();
+      const { error } = await client
+        .from(PROFILES_TABLE)
+        .update({ pinned_take_id: safeTakeId })
+        .eq("id", userId);
+
+      if (error) {
+        if (isColumnMissingError(error)) {
+          console.warn("pinned_take_id column does not exist yet in profiles table. Using local fallback.");
+          return { success: true, error: null, fallback: true };
+        }
+        return { success: false, error };
+      }
+
+      return { success: true, error: null };
+    } catch (err) {
+      return { success: true, error: null, fallback: true };
+    }
+  }
+
+  function getPinnedTakeId(profile) {
+    if (!profile) return null;
+    return profile.pinned_take_id || readLocalPinnedTake(profile.id) || null;
+  }
+
   window.ClashlyProfiles = {
     PROFILES_TABLE,
     AVATAR_BUCKET,
@@ -280,5 +341,7 @@
     upsertProfile,
     hasSeenOnboardingInDb,
     markOnboardingSeenInDb,
+    setPinnedTake,
+    getPinnedTakeId,
   };
 })();

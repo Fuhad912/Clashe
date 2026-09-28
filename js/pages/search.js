@@ -436,7 +436,6 @@
     setGroupCount("search-takes-count", takes.length);
     window.ClashlyTakeRenderer.renderTakeList(streamEl, takes, {
       currentUserId,
-      hideCommentsAction: true,
       showAiJudgeAction: true,
       hideInlineAiJudgeResult: true,
       showOpenLink: false,
@@ -456,6 +455,9 @@
     window.ClashlyTakeRenderer.bindBookmarkActions(streamEl, {
       onStatus: setState,
       onBookmark: handleBookmark,
+    });
+    window.ClashlyTakeRenderer.bindCommentActions(streamEl, {
+      onComments: handleCommentsOpen,
     });
     window.ClashlyTakeRenderer.bindAiJudgeActions(streamEl, {
       onStatus: setState,
@@ -644,11 +646,7 @@
             <div class="trend-item__lead">
               <span class="trend-item__kicker">${rank} · ${safeCategory} · Trending</span>
               <button type="button" class="trend-item__more" aria-label="More options for ${safeKeyword}" tabindex="-1">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-                  <circle cx="5" cy="12" r="2"></circle>
-                  <circle cx="12" cy="12" r="2"></circle>
-                  <circle cx="19" cy="12" r="2"></circle>
-                </svg>
+                <i class="app-icon fa-solid fa-ellipsis" aria-hidden="true"></i>
               </button>
             </div>
             <div class="trend-item__keyword">${safeKeyword}</div>
@@ -760,12 +758,16 @@
   }
 
   function handleCommentsOpen(input) {
+    const targetTake = currentTakeResults.find((take) => take.id === input.takeId) || null;
+    if (currentUserId && targetTake && window.ClashePersonalization) {
+      window.ClashePersonalization.recordTakeEngagement(currentUserId, targetTake, "comment").catch(() => {});
+    }
+
     if (!window.ClashlyCommentsModal) {
       window.location.href = `take.html?id=${encodeURIComponent(input.takeId)}`;
       return;
     }
 
-    const targetTake = currentTakeResults.find((take) => take.id === input.takeId) || null;
     window.ClashlyCommentsModal.open({
       takeId: input.takeId,
       take: targetTake,
@@ -993,11 +995,18 @@
 
   function handleTakeUpdated(event) {
     const detail = event.detail || {};
-    if (!detail.takeId || !detail.vote) return;
-    updateTakeVoteState(detail.takeId, {
-      vote: detail.vote,
-      vote_loading: false,
-    });
+    if (!detail.takeId) return;
+    if (detail.vote) {
+      updateTakeVoteState(detail.takeId, {
+        vote: detail.vote,
+        vote_loading: false,
+      });
+    }
+    if (typeof detail.commentCount === "number") {
+      currentTakeResults = currentTakeResults.map((take) =>
+        take.id === detail.takeId ? { ...take, comment_count: detail.commentCount } : take
+      );
+    }
     syncSearchTakeState(detail.takeId);
   }
 

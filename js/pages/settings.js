@@ -351,6 +351,45 @@
     });
   }
 
+  async function initPushNotificationSettings() {
+    const toggle = document.getElementById("settings-push-toggle");
+    const description = document.getElementById("settings-push-description");
+    const status = document.getElementById("settings-push-status");
+    if (!toggle || !window.ClashlyPush) return;
+
+    async function refresh() {
+      const state = await window.ClashlyPush.getState();
+      toggle.setAttribute("aria-checked", state.enabled ? "true" : "false");
+      toggle.disabled = !state.supported || (!state.configured && !state.enabled) || (state.permission === "denied" && !state.enabled);
+      if (!state.supported) {
+        description.textContent = "Not available here. On iPhone, add Clashe to your Home Screen and open the installed app.";
+      } else if (state.permission === "denied") {
+        description.textContent = "Blocked by your device. Allow notifications for Clashe in browser or system settings.";
+      } else if (!state.configured) {
+        description.textContent = "Push delivery is being set up. Check back soon.";
+      } else {
+        description.textContent = state.enabled ? "Alerts are on for this device." : "Turn on alerts for this device.";
+      }
+    }
+
+    toggle.addEventListener("click", async () => {
+      const wasEnabled = toggle.getAttribute("aria-checked") === "true";
+      toggle.disabled = true;
+      status.hidden = true;
+      try {
+        if (wasEnabled) await window.ClashlyPush.disable();
+        else await window.ClashlyPush.enable();
+      } catch (error) {
+        status.textContent = error.message || "Could not update notifications.";
+        status.classList.add("is-error");
+        status.hidden = false;
+      }
+      await refresh();
+    });
+    window.addEventListener("clashe:push-state", () => refresh().catch(() => {}));
+    await refresh();
+  }
+
   async function initSettingsPage() {
     try {
       if (!window.ClashlySession) return;
@@ -406,6 +445,7 @@
 
       // Initialise email notification toggles now that we have a user ID
       await initEmailNotificationSettings(user.id);
+      initPushNotificationSettings().catch(() => {});
 
       const { modal, confirmBtn } = getDeleteModalElements();
       if (confirmBtn) {

@@ -15,9 +15,10 @@
   font-size: 0.84rem;
 }
 
-.settings-back-link svg {
+.settings-back-link .app-icon {
   width: 16px;
   height: 16px;
+  font-size: 16px;
 }
 
 .settings-stack {

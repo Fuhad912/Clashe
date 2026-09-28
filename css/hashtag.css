@@ -165,9 +165,10 @@ body[data-page="hashtag"] .feed-column {
   transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
-.hashtag-copy-btn svg {
+.hashtag-copy-btn .app-icon {
   width: 15px;
   height: 15px;
+  font-size: 15px;
 }
 
 .hashtag-copy-btn:hover {

@@ -22,6 +22,7 @@
     <meta name="apple-mobile-web-app-title" content="Clashe" />
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/icons.css" />
     <link rel="stylesheet" href="css/loader.css" />
     <link rel="stylesheet" href="css/auth.css" />
     <link rel="stylesheet" href="css/responsive.css" />
@@ -30,7 +31,8 @@
     <main class="auth-main">
       <section class="auth-brand" data-anim="brand">
         <div class="auth-logo" aria-hidden="true">
-          <img src="assets/clashly-mark.svg" alt="" />
+          <img src="assets/Lightmode_logo.svg" alt="Clashe" class="theme-logo theme-logo--light" />
+          <img src="assets/Darkmode_logo.svg" alt="Clashe" class="theme-logo theme-logo--dark" />
         </div>
         <p class="auth-eyebrow">Clashe</p>
         <h1 class="auth-title">Drop your take. Defend it.</h1>
@@ -84,33 +86,11 @@
 
           <div class="auth-oauth">
             <button id="auth-google-btn" type="button" class="auth-google-btn">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="#EA4335"
-                  d="M12 10.2v3.92h5.46c-.24 1.26-.96 2.33-2.04 3.05l3.3 2.56c1.92-1.78 3.03-4.4 3.03-7.53 0-.72-.06-1.42-.19-2.1H12z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 22c2.7 0 4.96-.89 6.62-2.41l-3.3-2.56c-.92.62-2.1.99-3.32.99-2.55 0-4.7-1.72-5.47-4.03l-3.4 2.63A10 10 0 0 0 12 22z"
-                />
-                <path
-                  fill="#4A90E2"
-                  d="M6.53 13.99A5.99 5.99 0 0 1 6.23 12c0-.69.12-1.36.3-1.99l-3.4-2.63A10 10 0 0 0 2 12c0 1.61.39 3.13 1.13 4.37l3.4-2.38z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M12 5.98c1.47 0 2.8.5 3.84 1.49l2.88-2.88C16.95 2.95 14.7 2 12 2a10 10 0 0 0-8.87 5.38l3.4 2.63c.77-2.3 2.92-4.03 5.47-4.03z"
-                />
-              </svg>
+              <i class="app-icon fa-brands fa-google" aria-hidden="true"></i>
               <span id="auth-google-btn-label">Continue with Google</span>
             </button>
             <button id="auth-x-btn" type="button" class="auth-x-btn">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M18.244 2H21l-6.56 7.5L22.2 22h-6.1l-4.8-6.2L5.86 22H3.1l7.02-8.02L2 2h6.26l4.33 5.67L18.244 2Zm-1.07 18h1.69L6.11 3.9H4.29L17.17 20Z"
-                />
-              </svg>
+              <i class="app-icon fa-brands fa-x-twitter" aria-hidden="true"></i>
               <span id="auth-x-btn-label">Continue with X</span>
             </button>
           </div>
@@ -128,16 +108,8 @@
               <div class="auth-input-wrap auth-input-wrap--password">
                 <input id="auth-password" type="password" name="password" placeholder="Enter your password" required />
                 <button class="password-toggle" type="button" data-toggle-password="auth-password" aria-label="Show password">
-                  <svg class="password-toggle__icon password-toggle__icon--show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6S2 12 2 12Z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                  </svg>
-                  <svg class="password-toggle__icon password-toggle__icon--hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 3l18 18"></path>
-                    <path d="M10.6 10.7A3 3 0 0 0 13.3 13.4"></path>
-                    <path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.2 0 10 7 10 7a17.2 17.2 0 0 1-4 4.7"></path>
-                    <path d="M6.6 6.7A17 17 0 0 0 2 12s3.8 7 10 7a10.6 10.6 0 0 0 4-.8"></path>
-                  </svg>
+                  <i class="app-icon fa-solid fa-eye password-toggle__icon password-toggle__icon--show" aria-hidden="true"></i>
+                  <i class="app-icon fa-solid fa-eye-slash password-toggle__icon password-toggle__icon--hide" aria-hidden="true"></i>
                 </button>
               </div>
               <div class="auth-field__meta">
@@ -162,16 +134,8 @@
                     data-toggle-password="auth-confirm-password"
                     aria-label="Show confirmed password"
                   >
-                    <svg class="password-toggle__icon password-toggle__icon--show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6S2 12 2 12Z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
-                    <svg class="password-toggle__icon password-toggle__icon--hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <path d="M3 3l18 18"></path>
-                      <path d="M10.6 10.7A3 3 0 0 0 13.3 13.4"></path>
-                      <path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.2 0 10 7 10 7a17.2 17.2 0 0 1-4 4.7"></path>
-                      <path d="M6.6 6.7A17 17 0 0 0 2 12s3.8 7 10 7a10.6 10.6 0 0 0 4-.8"></path>
-                    </svg>
+                    <i class="app-icon fa-solid fa-eye password-toggle__icon password-toggle__icon--show" aria-hidden="true"></i>
+                    <i class="app-icon fa-solid fa-eye-slash password-toggle__icon password-toggle__icon--hide" aria-hidden="true"></i>
                   </button>
                 </div>
               </div>
@@ -179,9 +143,7 @@
               <label class="auth-check" for="auth-terms">
                 <input id="auth-terms" name="terms" type="checkbox" value="yes" />
                 <span class="auth-check__box" aria-hidden="true">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="m3.5 8 2.6 2.6L12.5 4.5"></path>
-                  </svg>
+                  <i class="app-icon fa-solid fa-check" aria-hidden="true"></i>
                 </span>
                 <span class="auth-check__text">
                   By continuing, you agree to Clashe
@@ -229,9 +191,7 @@
         <header class="otp-modal__head">
           <h2 id="otp-title">Verify your email</h2>
           <button type="button" class="otp-close-btn" data-close-otp="true" aria-label="Close verification modal">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12"></path>
-            </svg>
+            <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
           </button>
         </header>
 
