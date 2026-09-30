@@ -842,12 +842,18 @@
     if (!window.ClasheCache) return;
     const state = getSectionState(activeSection);
     if (!state || !Array.isArray(state.takes) || !state.takes.length) return;
-    window.ClasheCache.savePageState("home", {
-      section: activeSection,
-      takes: state.takes,
-      hasMore: state.hasMore,
-      cursor: state.cursor,
-    });
+    window.ClasheCache.savePageState(
+      "home",
+      {
+        section: activeSection,
+        takes: state.takes,
+        hasMore: state.hasMore,
+        cursor: state.cursor,
+        userId: currentUserId || "",
+      },
+      undefined,
+      currentUserId || ""
+    );
   }
 
   async function silentRevalidateFeed() {
@@ -860,15 +866,30 @@
           currentUserId,
         });
         if (freshResult && Array.isArray(freshResult.takes) && freshResult.takes.length > 0) {
+          const freshMap = new Map(freshResult.takes.map((t) => [t.id, t]));
+
+          // Synchronize existing takes with fresh vote counts and user_vote state
+          state.takes = state.takes.map((existingTake) => {
+            const fresh = freshMap.get(existingTake.id);
+            if (!fresh) return existingTake;
+            return {
+              ...existingTake,
+              ...fresh,
+              profile: existingTake.profile || fresh.profile,
+            };
+          });
+
+          // Prepend brand new takes if user is scrolled near top
           const existingIds = new Set(state.takes.map((t) => t.id));
           const newTakes = freshResult.takes.filter((t) => !existingIds.has(t.id));
           if (newTakes.length > 0) {
             const currentScrollY = window.scrollY || document.documentElement.scrollTop || 0;
             if (currentScrollY < 60) {
               state.takes = [...newTakes, ...state.takes];
-              renderCurrentFeed();
             }
           }
+
+          renderCurrentFeed();
           saveCurrentHomeState();
         }
       }
@@ -878,6 +899,21 @@
   function handleTakeCreated(event) {
     const newTake = event && event.detail && event.detail.take;
     if (!newTake) return;
+
+    if ((!newTake.profile || !newTake.profile.username) && window.ClashlyProfiles) {
+      const authorId = newTake.user_id || currentUserId;
+      if (authorId && typeof window.ClashlyProfiles.getCachedProfileById === "function") {
+        const cached = window.ClashlyProfiles.getCachedProfileById(authorId);
+        if (cached && cached.username) {
+          newTake.profile = {
+            id: cached.id,
+            username: cached.username,
+            avatar_url: cached.avatar_url || "",
+          };
+        }
+      }
+    }
+
     const state = getSectionState(activeSection);
     if (!state.takes.some((t) => t.id === newTake.id)) {
       state.takes.unshift(newTake);
@@ -935,8 +971,9 @@
         }
       });
 
-      // Check cache for instant SWR hydration
-      const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState("home") : null;
+      // Check cache for instant SWR hydration, validating active user ownership
+      const activeUser = window.ClasheCache && window.ClasheCache.getActiveUserId ? window.ClasheCache.getActiveUserId() : "";
+      const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState("home", undefined, activeUser) : null;
       const cachedData = cachedRecord && cachedRecord.data;
 
       if (cachedData && Array.isArray(cachedData.takes) && cachedData.takes.length > 0) {
@@ -960,8 +997,18 @@
 
         // Silent background session check & feed revalidation
         window.ClashlySession.resolveSession().then((sessionState) => {
-          currentUserId = sessionState.user ? sessionState.user.id : "";
-          silentRevalidateFeed();
+          const resolvedUserId = sessionState.user ? sessionState.user.id : "";
+          if (currentUserId !== resolvedUserId) {
+            currentUserId = resolvedUserId;
+            if (window.ClasheCache) {
+              window.ClasheCache.setActiveUserId(resolvedUserId);
+            }
+            loadFeed({ append: false, skipSkeleton: true }).then(() => {
+              saveCurrentHomeState();
+            }).catch(() => {});
+          } else {
+            silentRevalidateFeed();
+          }
         }).catch(() => {});
       } else {
         // Cold first load: show skeleton and fetch
@@ -973,6 +1020,9 @@
 
         const sessionState = await window.ClashlySession.resolveSession();
         currentUserId = sessionState.user ? sessionState.user.id : "";
+        if (window.ClasheCache) {
+          window.ClasheCache.setActiveUserId(currentUserId);
+        }
         await loadFeed({ append: false, skipSkeleton: true });
         saveCurrentHomeState();
       }
@@ -986,7 +1036,8 @@
   function tryFastSyncHydrate() {
     const feedEl = document.getElementById("feed-stream");
     if (!feedEl || !window.ClasheCache || !window.ClashlyTakeRenderer) return;
-    const cachedRecord = window.ClasheCache.getPageState("home");
+    const activeUser = window.ClasheCache.getActiveUserId ? window.ClasheCache.getActiveUserId() : "";
+    const cachedRecord = window.ClasheCache.getPageState("home", undefined, activeUser);
     const cachedData = cachedRecord && cachedRecord.data;
     if (cachedData && Array.isArray(cachedData.takes) && cachedData.takes.length > 0) {
       if (cachedData.section) {

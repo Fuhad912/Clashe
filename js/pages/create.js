@@ -221,6 +221,28 @@
         resetPreview(preview);
         updateCount(textarea, countEl, maxChars);
 
+        // Prepend new take to cached home feed so it renders immediately with user profile on redirect
+        if (createResult.take && window.ClasheCache) {
+          try {
+            const cachedRecord = window.ClasheCache.getPageState("home");
+            const cachedData = (cachedRecord && cachedRecord.data) || {
+              section: "for-you",
+              takes: [],
+              hasMore: true,
+              cursor: null,
+            };
+            if (Array.isArray(cachedData.takes)) {
+              const existingIndex = cachedData.takes.findIndex((t) => t.id === createResult.take.id);
+              if (existingIndex === -1) {
+                cachedData.takes.unshift(createResult.take);
+              } else {
+                cachedData.takes[existingIndex] = createResult.take;
+              }
+              window.ClasheCache.savePageState("home", cachedData, 0);
+            }
+          } catch (_) {}
+        }
+
         const hasReferrer =
           document.referrer &&
           !document.referrer.includes("auth.html") &&

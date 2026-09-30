@@ -23,7 +23,17 @@
     const client = getClient();
     if (!client) throw new Error("Sign in to manage notifications.");
     const { data, error } = await client.functions.invoke(FUNCTION_NAME, { method: method || "POST", body });
-    if (error) throw error;
+    if (error) {
+      let serverMessage = "";
+      try {
+        const response = error.context;
+        if (response && typeof response.json === "function") {
+          const details = await response.json();
+          serverMessage = details && details.error ? String(details.error) : "";
+        }
+      } catch (_) {}
+      throw new Error(serverMessage || error.message || "Push service request failed.");
+    }
     if (data && data.error) throw new Error(data.error);
     return data || {};
   }
@@ -69,12 +79,33 @@
   async function getState() {
     if (!isSupported()) return { supported: false, enabled: false, permission: "unsupported", configured: false };
     let configured = false;
+    let configError = "";
     try {
       const config = await getConfig();
       configured = Boolean(config.configured && config.publicKey);
-    } catch (_) {}
+    } catch (error) {
+      configError = error.message || "Could not contact the push service.";
+    }
     const subscription = await getSubscription().catch(() => null);
-    return { supported: true, configured, permission: Notification.permission, enabled: Boolean(subscription && Notification.permission === "granted") };
+    let registrationError = "";
+    activeSubscription = false;
+    if (subscription && configured && Notification.permission === "granted") {
+      try {
+        await invoke({ action: "subscribe", subscription: subscription.toJSON() });
+        activeSubscription = true;
+      } catch (error) {
+        activeSubscription = false;
+        registrationError = error.message || "Could not register this device with the push service.";
+      }
+    }
+    return {
+      supported: true,
+      configured,
+      permission: Notification.permission,
+      enabled: Boolean(configured && subscription && Notification.permission === "granted" && !registrationError),
+      registrationError,
+      configError,
+    };
   }
 
   async function enable() {
@@ -125,10 +156,21 @@
   async function sendNotification(notificationId) {
     if (!notificationId) return;
     try {
-      await invoke({ action: "send", notificationId });
+      return await invoke({ action: "send", notificationId });
     } catch (error) {
       console.warn("[Clashe Push] Could not deliver notification.", error);
+      throw error;
     }
+  }
+
+  async function sendTestNotification() {
+    if (Notification.permission !== "granted") throw new Error("Allow notifications on this device first.");
+    const subscription = await getSubscription();
+    if (!subscription) throw new Error("This device is not subscribed. Turn notifications off and on again.");
+    await invoke({ action: "subscribe", subscription: subscription.toJSON() });
+    const result = await invoke({ action: "test" });
+    if (!result.sent) throw new Error("The push service did not accept a test notification.");
+    return result;
   }
 
   function dismissPrompt() {
@@ -212,7 +254,7 @@
     syncExistingSubscription().catch(() => {});
   }
 
-  window.ClashlyPush = { isSupported, isActiveOnThisDevice: () => activeSubscription, getState, getConfig, enable, disable, sendNotification, maybeShowInstalledPrompt };
+  window.ClashlyPush = { isSupported, isActiveOnThisDevice: () => activeSubscription, getState, getConfig, enable, disable, sendNotification, sendTestNotification, maybeShowInstalledPrompt };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);
   } else {

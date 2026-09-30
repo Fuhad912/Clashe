@@ -573,6 +573,17 @@
   }
 
   async function redirectAfterAuth(userId) {
+    if (window.ClasheCache) {
+      window.ClasheCache.clearAll();
+      window.ClasheCache.setActiveUserId(userId);
+    }
+    if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+      window.ClashlyTakeRenderer.clearCache();
+    }
+    if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+      window.ClashlyProfiles.clearProfileCache();
+    }
+
     const profileCheck = await window.ClashlyProfiles.hasCompletedProfile(userId);
     if (profileCheck.error) {
       throw profileCheck.error;

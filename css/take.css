@@ -1032,6 +1032,34 @@
 
 /* ── Search Entry Mode (?from=search) ───────────────────────── */
 
+/* Notification links show the selected post as a feed card. */
+html.take-page--from-notifications .app-main--take {
+  display: block !important;
+}
+
+html.take-page--from-notifications .side-column,
+html.take-page--from-notifications .ai-judge,
+html.take-page--from-notifications .comments-shell {
+  display: none !important;
+}
+
+html.take-page--from-notifications #take-detail-stream .take-item {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+html.take-page--from-notifications #take-detail-stream .take-item__text {
+  font-size: clamp(0.98rem, 0.94rem + 0.28vw, 1.16rem);
+  line-height: 1.44;
+}
+
+html.take-page--from-notifications #take-detail-stream .take-item__actions-wrapper {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: 0;
+}
+
 html.take-page--from-search .take-detail {
   border: 0;
   background: transparent;
@@ -1240,4 +1268,3 @@ html.take-page--from-search .comments-shell {
 :root[data-theme="dark"] .comment-action--like.is-active .comment-action__icon .app-icon {
   color: #fb7185;
 }
-

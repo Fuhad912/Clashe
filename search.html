@@ -67,6 +67,12 @@
           </form>
         </header>
 
+        <nav id="search-result-tabs" class="search-result-tabs" aria-label="Search result types" hidden>
+          <button type="button" class="search-result-tabs__tab is-active" data-search-tab="top" aria-current="page">Top</button>
+          <button type="button" class="search-result-tabs__tab" data-search-tab="takes">Takes</button>
+          <button type="button" class="search-result-tabs__tab" data-search-tab="people">People</button>
+        </nav>
+
         <section id="search-discovery" class="search-discovery" hidden>
           <header class="search-discovery__head">
             <h2 class="search-discovery__title">Trending now</h2>
@@ -86,7 +92,6 @@
           <header class="search-group__head">
             <div class="search-group__label">
               <h2>People</h2>
-              <span id="search-users-count" class="search-group__count" hidden></span>
             </div>
           </header>
           <div id="search-users-body" class="search-list"></div>
@@ -96,7 +101,6 @@
           <header class="search-group__head">
             <div class="search-group__label">
               <h2>Takes</h2>
-              <span id="search-takes-count" class="search-group__count" hidden></span>
             </div>
           </header>
           <div id="search-takes-stream" class="feed-stream"></div>
@@ -106,7 +110,6 @@
           <header class="search-group__head">
             <div class="search-group__label">
               <h2>Tags</h2>
-              <span id="search-hashtags-count" class="search-group__count" hidden></span>
             </div>
           </header>
           <div id="search-hashtags-body" class="search-list"></div>

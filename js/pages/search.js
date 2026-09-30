@@ -6,12 +6,44 @@
   let currentTakeResults = [];
   let currentUserResults = [];
   let currentHashtagResults = [];
+  let activeSearchTab = "top";
+  let resultsLoaded = false;
   let currentTrendingTopics = [];
   let expandedTakeId = "";
 
   function getQuery() {
     const params = new URLSearchParams(window.location.search);
     return (params.get("q") || "").trim();
+  }
+
+  function getSearchTab() {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    return tab === "takes" || tab === "people" ? tab : "top";
+  }
+
+  function syncSearchTabs() {
+    const tabs = document.getElementById("search-result-tabs");
+    const shell = document.querySelector(".search-shell");
+    if (!tabs || !shell) return;
+    tabs.hidden = !currentQuery;
+    shell.dataset.searchTab = activeSearchTab;
+    tabs.querySelectorAll("[data-search-tab]").forEach((button) => {
+      const selected = button.dataset.searchTab === activeSearchTab;
+      button.classList.toggle("is-active", selected);
+      if (selected) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    });
+  }
+
+  function selectSearchTab(tab) {
+    if (!currentQuery || !["top", "takes", "people"].includes(tab)) return;
+    activeSearchTab = tab;
+    const url = new URL(window.location.href);
+    if (tab === "top") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    window.history.replaceState(window.history.state, "", url);
+    syncSearchTabs();
+    renderEmptyState();
   }
 
   function getExpandedTakeQuery() {
@@ -99,13 +131,6 @@
     }
   }
 
-  function setGroupCount(elementId, count) {
-    const countEl = document.getElementById(elementId);
-    if (!countEl) return;
-    const safeCount = Math.max(0, Number(count || 0));
-    countEl.hidden = safeCount === 0;
-    countEl.textContent = safeCount ? safeCount.toLocaleString() : "";
-  }
 
 
   async function decorateUsersWithFollowState(users) {
@@ -347,12 +372,10 @@
     if (!users.length) {
       groupEl.hidden = true;
       bodyEl.innerHTML = "";
-      setGroupCount("search-users-count", 0);
       return;
     }
 
     groupEl.hidden = false;
-    setGroupCount("search-users-count", users.length);
     bodyEl.innerHTML = users
       .map(
         (user) => `
@@ -392,12 +415,10 @@
     if (!hashtags.length) {
       groupEl.hidden = true;
       bodyEl.innerHTML = "";
-      setGroupCount("search-hashtags-count", 0);
       return;
     }
 
     groupEl.hidden = false;
-    setGroupCount("search-hashtags-count", hashtags.length);
     bodyEl.innerHTML = hashtags
       .map(
         (hashtag) => `
@@ -424,7 +445,6 @@
       groupEl.hidden = true;
       streamEl.innerHTML = "";
       expandedTakeId = "";
-      setGroupCount("search-takes-count", 0);
       return;
     }
 
@@ -433,7 +453,6 @@
     }
 
     groupEl.hidden = false;
-    setGroupCount("search-takes-count", takes.length);
     window.ClashlyTakeRenderer.renderTakeList(streamEl, takes, {
       currentUserId,
       showAiJudgeAction: true,
@@ -583,7 +602,7 @@
     bodyEl.dataset.followBound = "true";
   }
 
-  function renderEmptyState(hasResults) {
+  function renderEmptyState() {
     const emptyEl = document.getElementById("search-empty");
     if (!emptyEl) return;
 
@@ -593,24 +612,18 @@
       return;
     }
 
-    emptyEl.hidden = hasResults;
-    emptyEl.textContent = `No results found for "${currentQuery}".`;
+    const hasResults = activeSearchTab === "takes"
+      ? currentTakeResults.length > 0
+      : activeSearchTab === "people"
+        ? currentUserResults.length > 0
+        : Boolean(currentTakeResults.length || currentUserResults.length || currentHashtagResults.length);
+    emptyEl.hidden = !resultsLoaded || hasResults;
+    emptyEl.textContent = activeSearchTab === "top"
+      ? `No results found for "${currentQuery}".`
+      : `No ${activeSearchTab} found for "${currentQuery}".`;
   }
 
-  function formatTrendingVolume(takeCount, engagementCount, score) {
-    const rawVolume = Math.max(
-      takeCount || 1,
-      Math.round((takeCount || 1) * 2 + (engagementCount || 0) * 14 + (score || 0) * 12)
-    );
-
-    if (rawVolume >= 1_000_000) {
-      return `${(rawVolume / 1_000_000).toFixed(1).replace(/\.0$/, "")}M takes`;
-    }
-    if (rawVolume >= 1_000) {
-      return `${(rawVolume / 1_000).toFixed(1).replace(/\.0$/, "")}K takes`;
-    }
-    return `${rawVolume.toLocaleString()} takes`;
-  }
+  // NOTE: `formatTrendingVolume` removed — trending UI no longer shows take counts.
 
   function renderTrendingTopics(topics) {
     const listEl = document.getElementById("search-trending-topics");
@@ -632,7 +645,6 @@
         const safeKeyword = window.ClashlyUtils.escapeHtml(keyword);
         const category = topic.category || "Debate";
         const safeCategory = window.ClashlyUtils.escapeHtml(category);
-        const volumeLabel = formatTrendingVolume(topic.takeCount, topic.engagementCount, topic.score);
         const rank = index + 1;
 
         return `
@@ -641,7 +653,7 @@
             data-search-term="${safeKeyword}"
             role="button"
             tabindex="0"
-            aria-label="${rank}, ${safeCategory} Trending: ${safeKeyword}, ${volumeLabel}"
+               aria-label="${rank}, ${safeCategory} Trending: ${safeKeyword}"
           >
             <div class="trend-item__lead">
               <span class="trend-item__kicker">${rank} · ${safeCategory} · Trending</span>
@@ -650,7 +662,6 @@
               </button>
             </div>
             <div class="trend-item__keyword">${safeKeyword}</div>
-            <div class="trend-item__stat">${volumeLabel}</div>
           </div>
         `;
       })
@@ -1019,8 +1030,11 @@
 
   async function loadResults() {
     currentQuery = getQuery();
+    activeSearchTab = getSearchTab();
+    resultsLoaded = false;
     expandedTakeId = currentQuery ? getExpandedTakeQuery() : "";
     updateHeader();
+    syncSearchTabs();
     setDiscoveryVisibility(!currentQuery);
     setExploreVisibility(!currentQuery);
 
@@ -1078,8 +1092,8 @@
       renderUsers(currentUserResults);
       renderHashtags(currentHashtagResults);
 
-      const hasResults = currentTakeResults.length || currentUserResults.length || currentHashtagResults.length;
-      renderEmptyState(Boolean(hasResults));
+      resultsLoaded = true;
+      renderEmptyState();
       setState("", "");
       addRecentSearch(currentQuery);
 
@@ -1101,6 +1115,13 @@
       if (!window.ClashlySearch || !window.ClashlyTakeRenderer || !window.ClashlySession) return;
 
       const searchForm = document.getElementById("search-page-form");
+      const resultTabs = document.getElementById("search-result-tabs");
+      if (resultTabs) {
+        resultTabs.addEventListener("click", (event) => {
+          const button = event.target instanceof Element ? event.target.closest("[data-search-tab]") : null;
+          if (button) selectSearchTab(button.dataset.searchTab);
+        });
+      }
       if (searchForm) {
         searchForm.addEventListener("submit", (event) => {
           event.preventDefault();

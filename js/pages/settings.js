@@ -244,10 +244,18 @@
       closeDeleteModal();
       setDeleteStatus("Account deleted. Redirecting...", "success");
       try {
+        if (window.ClasheCache) window.ClasheCache.clearAll();
+        if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+          window.ClashlyTakeRenderer.clearCache();
+        }
+        if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+          window.ClashlyProfiles.clearProfileCache();
+        }
         await window.ClashlyAuth.signOut();
       } catch {
         // Session may already be invalid after deletion.
       }
+      if (window.ClasheCache) window.ClasheCache.clearAll();
       window.location.replace("auth.html");
     } catch (error) {
       setDeleteStatus("Could not delete account. Please try again.", "error");
@@ -355,18 +363,22 @@
     const toggle = document.getElementById("settings-push-toggle");
     const description = document.getElementById("settings-push-description");
     const status = document.getElementById("settings-push-status");
+    const testButton = document.getElementById("settings-push-test");
     if (!toggle || !window.ClashlyPush) return;
 
     async function refresh() {
       const state = await window.ClashlyPush.getState();
       toggle.setAttribute("aria-checked", state.enabled ? "true" : "false");
       toggle.disabled = !state.supported || (!state.configured && !state.enabled) || (state.permission === "denied" && !state.enabled);
+      if (testButton) testButton.disabled = !state.enabled || !state.configured;
       if (!state.supported) {
         description.textContent = "Not available here. On iPhone, add Clashe to your Home Screen and open the installed app.";
       } else if (state.permission === "denied") {
         description.textContent = "Blocked by your device. Allow notifications for Clashe in browser or system settings.";
       } else if (!state.configured) {
-        description.textContent = "Push delivery is being set up. Check back soon.";
+        description.textContent = state.configError || "Push delivery is being set up. Check back soon.";
+      } else if (state.registrationError) {
+        description.textContent = `Device permission is on, but registration failed: ${state.registrationError}`;
       } else {
         description.textContent = state.enabled ? "Alerts are on for this device." : "Turn on alerts for this device.";
       }
@@ -386,6 +398,22 @@
       }
       await refresh();
     });
+    if (testButton) {
+      testButton.addEventListener("click", async () => {
+        testButton.disabled = true;
+        status.hidden = true;
+        try {
+          await window.ClashlyPush.sendTestNotification();
+          status.textContent = "Test sent. Check this device's notifications.";
+          status.classList.remove("is-error");
+        } catch (error) {
+          status.textContent = error.message || "Could not send a test notification.";
+          status.classList.add("is-error");
+        }
+        status.hidden = false;
+        await refresh();
+      });
+    }
     window.addEventListener("clashe:push-state", () => refresh().catch(() => {}));
     await refresh();
   }

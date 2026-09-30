@@ -23,6 +23,8 @@
           const params = new URLSearchParams(window.location.search);
           if (params.get("from") === "search") {
             document.documentElement.classList.add("take-page--from-search");
+          } else if (params.get("from") === "notifications") {
+            document.documentElement.classList.add("take-page--from-notifications");
           }
         } catch (_error) {
           // Ignore malformed URLs and continue with the default take layout.
@@ -192,4 +194,3 @@
     <script src="js/pages/take.js"></script>
   </body>
 </html>
-

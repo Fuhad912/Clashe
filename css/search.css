@@ -24,6 +24,46 @@
   z-index: 1;
 }
 
+.search-result-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.search-result-tabs[hidden] {
+  display: none;
+}
+
+.search-result-tabs__tab {
+  flex: 1;
+  min-height: 48px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-result-tabs__tab:hover,
+.search-result-tabs__tab:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface-soft);
+}
+
+.search-result-tabs__tab.is-active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
+}
+
+.search-shell[data-search-tab="takes"] #search-users-group,
+.search-shell[data-search-tab="takes"] #search-hashtags-group,
+.search-shell[data-search-tab="people"] #search-takes-group,
+.search-shell[data-search-tab="people"] #search-hashtags-group {
+  display: none;
+}
+
 .search-back-link {
   display: inline-flex;
   align-items: center;
@@ -186,11 +226,7 @@
   margin-bottom: 2px;
 }
 
-.trend-item__stat {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-}
+/* .trend-item__stat removed — trending items no longer display volume labels */
 
 .search-explore {
   position: relative;

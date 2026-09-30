@@ -586,6 +586,7 @@
     const activeFeedTakes = activeTab === "saved" ? currentSavedTakes : currentTakes;
     const isSavedTab = activeTab === "saved";
     feedEl.classList.remove("profile-feed--grid");
+    feedEl.classList.toggle("profile-feed--own", isOwnProfile);
 
     if (isSavedTab && !isOwnProfile) {
       feedEl.innerHTML = `<p class="feed-empty">Saved takes are private.</p>`;
@@ -601,6 +602,8 @@
         currentUserId: currentUser ? currentUser.id : "",
         showDeleteAction: true,
         showPinAction: isOwnProfile && activeTab === "takes",
+        showMoreAction: isOwnProfile,
+        showGridShareAction: true,
         emptyMessage: getProfileFeedEmptyMessage(isSavedTab),
       });
     } else {
@@ -609,6 +612,7 @@
         currentUserId: currentUser ? currentUser.id : "",
         showDeleteAction: true,
         showPinAction: isOwnProfile && activeTab === "takes",
+        showMoreAction: isOwnProfile,
         emptyMessage: getProfileFeedEmptyMessage(isSavedTab),
       });
     }
@@ -636,6 +640,18 @@
       onStatus: setFeedState,
       onDelete: handleTakeDelete,
     });
+    if (isOwnProfile && !feedEl.dataset.moreActionsBound) {
+      feedEl.dataset.moreActionsBound = "true";
+      window.ClashlyTakeRenderer.bindTakeMoreActions(feedEl, {
+        currentUserId: currentUser.id,
+        canPin: (take) => activeTab === "takes" && take.user_id === currentUser?.id,
+        canDelete: (take) => take.user_id === currentUser?.id,
+        onPin: handleTakePin,
+        onShare: handleShareOpen,
+        onDelete: handleTakeDelete,
+        onStatus: setFeedState,
+      });
+    }
     setFeedState(activeFeedTakes.length ? "" : isSavedTab ? "No saved takes yet." : "", "");
   }
 
@@ -1783,20 +1799,28 @@
   function saveCurrentProfileState() {
     if (!window.ClasheCache || !currentProfile) return;
     const targetKey = "profile_" + (currentProfile.username || currentProfile.id || "me");
-    window.ClasheCache.savePageState(targetKey, {
-      profile: currentProfile,
-      takes: currentTakes,
-      savedTakes: currentSavedTakes,
-      isOwnProfile,
-      followStats,
-      isFollowing,
-    });
+    const activeUserId = window.ClasheCache.getActiveUserId ? window.ClasheCache.getActiveUserId() : "";
+    window.ClasheCache.savePageState(
+      targetKey,
+      {
+        profile: currentProfile,
+        takes: currentTakes,
+        savedTakes: currentSavedTakes,
+        isOwnProfile,
+        followStats,
+        isFollowing,
+        userId: activeUserId,
+      },
+      undefined,
+      activeUserId
+    );
   }
 
   async function initProfileUI() {
     const target = resolveViewedProfileTarget("");
     const cacheKey = "profile_" + (target.username || target.id || "me");
-    const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey) : null;
+    const activeUser = window.ClasheCache && window.ClasheCache.getActiveUserId ? window.ClasheCache.getActiveUserId() : "";
+    const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey, undefined, activeUser) : null;
     const cachedData = cachedRecord && cachedRecord.data;
 
     if (cachedData && cachedData.profile) {
@@ -1865,7 +1889,8 @@
   function tryFastSyncHydrateProfile() {
     const target = resolveViewedProfileTarget("");
     const cacheKey = "profile_" + (target.username || target.id || "me");
-    const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey) : null;
+    const activeUser = window.ClasheCache && window.ClasheCache.getActiveUserId ? window.ClasheCache.getActiveUserId() : "";
+    const cachedRecord = window.ClasheCache ? window.ClasheCache.getPageState(cacheKey, undefined, activeUser) : null;
     const cachedData = cachedRecord && cachedRecord.data;
 
     if (cachedData && cachedData.profile) {

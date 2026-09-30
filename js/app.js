@@ -673,10 +673,31 @@
 
     try {
       if (window.ClashlyPush) await window.ClashlyPush.disable().catch(() => {});
+
+      if (window.ClasheCache) {
+        window.ClasheCache.clearAll();
+      }
+      if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+        window.ClashlyTakeRenderer.clearCache();
+      }
+      if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+        window.ClashlyProfiles.clearProfileCache();
+      }
+
       const { error } = await window.ClashlyAuth.signOut();
       if (error) {
         console.error("[Clashly] Logout failed.", error);
         return;
+      }
+
+      if (window.ClasheCache) {
+        window.ClasheCache.clearAll();
+      }
+      if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+        window.ClashlyTakeRenderer.clearCache();
+      }
+      if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+        window.ClashlyProfiles.clearProfileCache();
       }
 
       window.location.replace("auth.html");
@@ -859,6 +880,9 @@
 
     const sessionState = await window.ClashlySession.resolveSession();
     const user = sessionState.user || null;
+    if (window.ClasheCache) {
+      window.ClasheCache.setActiveUserId(user ? user.id : "");
+    }
     setLogoutVisibility(Boolean(user));
 
     if (!user) {
@@ -1494,11 +1518,26 @@
         resetCreateForm();
         setCreateStatus("", "");
 
+        const newTake = createResult.take || null;
+        if (newTake && (!newTake.profile || !newTake.profile.username) && window.ClashlyProfiles) {
+          const authorId = newTake.user_id || sessionState.user.id;
+          if (authorId && typeof window.ClashlyProfiles.getCachedProfileById === "function") {
+            const cached = window.ClashlyProfiles.getCachedProfileById(authorId);
+            if (cached && cached.username) {
+              newTake.profile = {
+                id: cached.id,
+                username: cached.username,
+                avatar_url: cached.avatar_url || "",
+              };
+            }
+          }
+        }
+
         // Notify active page (home feed, profile, etc.) to update with new take
         window.dispatchEvent(
           new CustomEvent(CREATE_EVENT, {
             detail: {
-              take: createResult.take || null,
+              take: newTake,
             },
           })
         );

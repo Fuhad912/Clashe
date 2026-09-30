@@ -12,6 +12,7 @@
   let pendingCommentLikeIds = new Set();
   let pendingCommentFocusId = "";
   let isSearchEntry = false;
+  let isNotificationEntry = false;
   let aiJudgeLoading = false;
   let aiJudgeBound = false;
 
@@ -39,6 +40,18 @@
     if (commentsShell instanceof HTMLElement) {
       commentsShell.hidden = isSearchEntry;
     }
+  }
+
+  function setNotificationEntryMode(isEnabled) {
+    isNotificationEntry = Boolean(isEnabled);
+    document.documentElement.classList.toggle("take-page--from-notifications", isNotificationEntry);
+    document.body.classList.toggle("take-page--from-notifications", isNotificationEntry);
+    const aiJudgePanel = document.getElementById("ai-judge-panel");
+    if (aiJudgePanel) aiJudgePanel.hidden = isSearchEntry || isNotificationEntry;
+    const commentsShell = document.querySelector(".comments-shell");
+    if (commentsShell instanceof HTMLElement) commentsShell.hidden = isSearchEntry || isNotificationEntry;
+    const backLink = document.getElementById("take-back-link");
+    if (backLink && isNotificationEntry) backLink.href = "notifications.html";
   }
 
   function setAiJudgeStatus(message, type) {
@@ -1133,6 +1146,7 @@
       const takeId = params.get("id");
       pendingCommentFocusId = String(params.get("commentId") || "").trim();
       setSearchEntryMode(params.get("from") === "search");
+      setNotificationEntryMode(params.get("from") === "notifications");
       if (!takeId) {
         setTakeState("Missing take id.", "error");
         return;
@@ -1144,11 +1158,11 @@
         window.clasheShowFeedSkeleton("take-detail-stream", 1);
       }
       const threadEl = document.getElementById("comments-thread");
-      if (threadEl && typeof window.clasheShowCommentsSkeleton === "function") {
+      if (!isNotificationEntry && threadEl && typeof window.clasheShowCommentsSkeleton === "function") {
         window.clasheShowCommentsSkeleton("comments-thread", 4);
       }
 
-      if (!isSearchEntry) {
+      if (!isSearchEntry && !isNotificationEntry) {
         bindCommentComposer();
         bindAiJudgePanel();
       }
@@ -1174,7 +1188,7 @@
       setTakeState("", "");
       renderTake();
       updateAiJudgeCountdown();
-      if (!isSearchEntry) {
+      if (!isSearchEntry && !isNotificationEntry) {
         setAiJudgeLoading(false);
         await loadComments();
         focusCommentFromQueryIfNeeded();

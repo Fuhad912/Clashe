@@ -14,20 +14,54 @@
     };
   }
 
-  function getUsername(profile) {
-    if (!profile || !profile.username) return "anonymous";
-    return String(profile.username);
+  function resolveProfile(take, currentUserId) {
+    if (take && take.profile && take.profile.username) {
+      return take.profile;
+    }
+
+    const userId = (take && take.user_id) || (currentUserId ? String(currentUserId) : "");
+    if (userId && window.ClashlyProfiles) {
+      let cached = null;
+      if (typeof window.ClashlyProfiles.getCachedProfileById === "function") {
+        cached = window.ClashlyProfiles.getCachedProfileById(userId);
+      } else if (typeof window.ClashlyProfiles.getCachedProfilesByIds === "function") {
+        const list = window.ClashlyProfiles.getCachedProfilesByIds([userId]);
+        cached = list && list[0];
+      }
+      if (cached && cached.username) {
+        if (take) {
+          take.profile = {
+            id: cached.id,
+            username: cached.username,
+            avatar_url: cached.avatar_url || "",
+          };
+        }
+        return cached;
+      }
+    }
+
+    return take && take.profile ? take.profile : null;
   }
 
-  function getAvatarMarkup(profile) {
-    const username = profile && profile.username ? profile.username : "cl";
+  function getUsername(profile, take, currentUserId) {
+    if (profile && profile.username) return String(profile.username);
+    if (take) {
+      const resolved = resolveProfile(take, currentUserId);
+      if (resolved && resolved.username) return String(resolved.username);
+    }
+    return "anonymous";
+  }
+
+  function getAvatarMarkup(profile, take, currentUserId) {
+    const resolved = (profile && profile.username) ? profile : (take ? resolveProfile(take, currentUserId) : profile);
+    const username = resolved && resolved.username ? resolved.username : "cl";
     const initials = window.ClashlyUtils.initialsFromName(username);
 
-    if (profile && profile.avatar_url) {
+    if (resolved && resolved.avatar_url) {
       return `
         <div class="take-item__avatar">
-          <img src="${window.ClashlyUtils.escapeHtml(profile.avatar_url)}" alt="${window.ClashlyUtils.escapeHtml(
-            getUsername(profile)
+          <img src="${window.ClashlyUtils.escapeHtml(resolved.avatar_url)}" alt="${window.ClashlyUtils.escapeHtml(
+            getUsername(resolved)
           )} avatar" loading="lazy" decoding="async" />
         </div>
       `;
@@ -61,7 +95,8 @@
   function getProfileHref(take, currentUserId) {
     if (!take || !take.user_id) return "profile.html";
 
-    const username = take.profile && take.profile.username ? String(take.profile.username) : "";
+    const resolved = resolveProfile(take, currentUserId);
+    const username = resolved && resolved.username ? String(resolved.username) : "";
     if (currentUserId && take.user_id === currentUserId) {
       const ownParams = new URLSearchParams();
       ownParams.set("id", take.user_id);
@@ -417,12 +452,15 @@
     const compactClass = options.compact ? " take-item--compact" : "";
     const expandedClass = options && options.isExpanded ? " is-expanded" : "";
     const toggleableClass = options && options.toggleOpenAction ? " take-item--toggleable" : "";
-    const username = getUsername(take.profile);
-    const profileHref = getProfileHref(take, options && options.currentUserId ? String(options.currentUserId) : "");
+    const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
+    const resolvedProfile = resolveProfile(take, currentUserId);
+    const username = getUsername(resolvedProfile, take, currentUserId);
+    const isAnonymous = username === "anonymous";
+    const profileHref = getProfileHref(take, currentUserId);
     const takeHrefSuffix = options && options.takeHrefSuffix ? String(options.takeHrefSuffix) : "";
     const takeHref = take && take.id ? `take.html?id=${encodeURIComponent(take.id)}${takeHrefSuffix}` : "take.html";
     const relativeTime = window.ClashlyUtils.formatRelativeTime(take.created_at);
-    const avatarMarkup = getAvatarMarkup(take.profile);
+    const avatarMarkup = getAvatarMarkup(resolvedProfile, take, currentUserId);
     const imageUrls = getTakeImageUrls(take);
     const hasImage = imageUrls.length > 0;
     const ownerBadge = getOwnerBadge(take, options.currentUserId);
@@ -526,8 +564,15 @@
           </div>`
         : "";
 
+    const needsProfileAttr =
+      isAnonymous && take && take.user_id
+        ? ` data-needs-profile-user-id="${window.ClashlyUtils.escapeHtml(take.user_id)}"`
+        : "";
+
     return `
-      <article class="take-item${compactClass}${expandedClass}${toggleableClass}" data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}">
+      <article class="take-item${compactClass}${expandedClass}${toggleableClass}" data-take-id="${window.ClashlyUtils.escapeHtml(
+        take.id
+      )}"${needsProfileAttr}>
         ${avatarMarkup}
         <div class="take-item__body">
           ${pinnedBadge}
@@ -556,7 +601,9 @@
     if (take && take.id) {
       renderedTakesMap.set(take.id, take);
     }
-    const username = getUsername(take.profile);
+    const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
+    const resolvedProfile = resolveProfile(take, currentUserId);
+    const username = getUsername(resolvedProfile, take, currentUserId);
     const relativeTime = window.ClashlyUtils.formatRelativeTime(take.created_at);
     const voteData = getVoteData(take);
     const cleanContent =
@@ -566,7 +613,6 @@
     const excerpt = renderTakeText(cleanContent || take.content);
     const imageUrls = getTakeImageUrls(take);
     const hasImage = imageUrls.length > 0;
-    const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
     const canDeleteTake = Boolean(options && options.showDeleteAction && currentUserId && take && take.user_id === currentUserId);
     const canPinTake = Boolean(options && options.showPinAction && currentUserId && take && take.user_id === currentUserId);
     const isPinned = Boolean(take && take.is_pinned);
@@ -606,6 +652,12 @@
           ${renderActionIcon("pin", isPinned)}
         </button>`
       : "";
+    const gridShareButton = options && options.showGridShareAction
+      ? `<button type="button" class="profile-grid-take__share" data-action="share"
+          data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
+          data-share-url="${window.ClashlyUtils.escapeHtml(window.ClashlyUtils.toTakeUrl(take.id))}"
+          aria-label="Share take" title="Share take">${renderActionIcon("share")}</button>`
+      : "";
     const pinnedBadge = isPinned
       ? `<span class="profile-grid-take__pinned-badge" title="Pinned take">
           <i class="app-icon fa-solid fa-thumbtack" aria-hidden="true"></i>
@@ -625,14 +677,23 @@
           ${renderActionIcon("delete")}
         </button>`
       : "";
+    const moreButton = options && options.showMoreAction
+      ? `<button type="button" class="profile-grid-take__more" data-action="take-more"
+          data-take-id="${window.ClashlyUtils.escapeHtml(take.id)}"
+          data-take-user-id="${window.ClashlyUtils.escapeHtml(take.user_id || "")}"
+          data-take-is-pinned="${isPinned ? "1" : "0"}"
+          aria-label="More options" title="More options">${renderActionIcon("more")}</button>`
+      : "";
 
     return `
       <article class="profile-grid-take${hasImage ? " profile-grid-take--with-image" : " profile-grid-take--text-only"}" data-take-id="${window.ClashlyUtils.escapeHtml(
         take.id
       )}">
         ${pinnedBadge}
+        ${gridShareButton}
         ${pinButton}
         ${deleteButton}
+        ${moreButton}
         ${mediaMarkup}
         <div class="profile-grid-take__meta">
           <span class="profile-grid-take__user">${window.ClashlyUtils.escapeHtml(username)}</span>
@@ -674,6 +735,7 @@
       .join("");
 
     hydrateCachedImages(container);
+    hydrateMissingTakeProfiles(container, safeOptions);
   }
 
   function appendTakeList(container, takes, options) {
@@ -706,6 +768,7 @@
 
     container.insertAdjacentHTML("beforeend", html);
     hydrateCachedImages(container);
+    hydrateMissingTakeProfiles(container, safeOptions);
   }
 
   function renderTakeGrid(container, takes, options) {
@@ -729,12 +792,23 @@
 
   function getTakeElements(rootEl, takeId) {
     if (!rootEl || !takeId) return [];
-    const selector = `[data-take-id="${escapeAttributeSelector(takeId)}"]`;
-    if (rootEl instanceof Element && rootEl.matches(selector)) {
+    const escaped = escapeAttributeSelector(takeId);
+    const containerSelector = `article.take-item[data-take-id="${escaped}"], article.profile-grid-take[data-take-id="${escaped}"]`;
+    if (rootEl instanceof Element && rootEl.matches(containerSelector)) {
       return [rootEl];
     }
     if (typeof rootEl.querySelectorAll !== "function") return [];
-    return Array.from(rootEl.querySelectorAll(selector));
+    const found = Array.from(rootEl.querySelectorAll(containerSelector));
+    if (found.length) return found;
+
+    // Fallback: If rootEl or children use generic data-take-id without article tag
+    const genericSelector = `[data-take-id="${escaped}"]`;
+    if (rootEl instanceof Element && rootEl.matches(genericSelector)) {
+      return [rootEl];
+    }
+    return Array.from(rootEl.querySelectorAll(genericSelector)).filter(
+      (el) => !el.closest(".take-item, .profile-grid-take") || el.matches(".take-item, .profile-grid-take")
+    );
   }
 
   function syncVoteButton(button, isSelected, count, isDisabled) {
@@ -854,6 +928,43 @@
       syncVoteMeta(item, voteData);
       syncTakeJudgeCountdown(item, take);
 
+      if (item.classList.contains("profile-grid-take")) {
+        const metaSpan = item.querySelector(".profile-grid-take__meta span:nth-of-type(3)");
+        if (metaSpan) {
+          metaSpan.textContent = `Agree ${voteData.agreeCount} | Disagree ${voteData.disagreeCount}`;
+        }
+        const existingVoteBadge = item.querySelector(".profile-grid-vote");
+        if (voteData.userVote === "agree") {
+          if (existingVoteBadge) {
+            existingVoteBadge.className = "profile-grid-vote profile-grid-vote--agree";
+            existingVoteBadge.textContent = "You agreed";
+          } else {
+            const metaContainer = item.querySelector(".profile-grid-take__meta");
+            if (metaContainer) {
+              const badge = document.createElement("span");
+              badge.className = "profile-grid-vote profile-grid-vote--agree";
+              badge.textContent = "You agreed";
+              metaContainer.appendChild(badge);
+            }
+          }
+        } else if (voteData.userVote === "disagree") {
+          if (existingVoteBadge) {
+            existingVoteBadge.className = "profile-grid-vote profile-grid-vote--disagree";
+            existingVoteBadge.textContent = "You disagreed";
+          } else {
+            const metaContainer = item.querySelector(".profile-grid-take__meta");
+            if (metaContainer) {
+              const badge = document.createElement("span");
+              badge.className = "profile-grid-vote profile-grid-vote--disagree";
+              badge.textContent = "You disagreed";
+              metaContainer.appendChild(badge);
+            }
+          }
+        } else if (existingVoteBadge) {
+          existingVoteBadge.remove();
+        }
+      }
+
       if (typeof take.comment_count === "number") {
         const commentButton = item.querySelector("[data-action='comments']");
         if (commentButton) {
@@ -912,28 +1023,45 @@
     });
   }
 
+  const pendingVoteTakeIds = new Set();
+
   function bindVoteActions(rootEl, handlers) {
     if (!rootEl || !handlers || typeof handlers.onVote !== "function") return;
 
-    const voteButtons = rootEl.querySelectorAll("[data-action='vote']");
-    voteButtons.forEach((button) => {
-      button.addEventListener("click", async () => {
-        const takeId = button.getAttribute("data-take-id");
-        const voteType = button.getAttribute("data-vote-type");
-        if (!takeId || !voteType || button.disabled) return;
+    rootEl._onTakeVoteHandlers = handlers;
 
-        try {
-          await handlers.onVote({
-            takeId,
-            voteType,
-          });
-        } catch (error) {
-          if (handlers.onStatus) {
-            handlers.onStatus(window.ClashlyUtils.reportError("Vote action failed.", error, "Could not update vote."), "error");
-          }
+    if (rootEl.dataset.takeVoteBound === "true") return;
+
+    rootEl.addEventListener("click", async (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const button = target.closest("[data-action='vote']");
+      if (!button || !rootEl.contains(button)) return;
+
+      const takeId = button.getAttribute("data-take-id");
+      const voteType = button.getAttribute("data-vote-type");
+      if (!takeId || !voteType || button.disabled) return;
+
+      // Prevent concurrent rapid taps from interleaving on the same take
+      if (pendingVoteTakeIds.has(takeId)) return;
+      pendingVoteTakeIds.add(takeId);
+
+      const activeHandlers = rootEl._onTakeVoteHandlers || handlers;
+      try {
+        await activeHandlers.onVote({
+          takeId,
+          voteType,
+        });
+      } catch (error) {
+        if (activeHandlers && activeHandlers.onStatus) {
+          activeHandlers.onStatus(window.ClashlyUtils.reportError("Vote action failed.", error, "Could not update vote."), "error");
         }
-      });
+      } finally {
+        pendingVoteTakeIds.delete(takeId);
+      }
     });
+
+    rootEl.dataset.takeVoteBound = "true";
   }
 
   function bindCommentActions(rootEl, handlers) {
@@ -1080,6 +1208,73 @@
     imgs.forEach((img) => {
       if (img.complete && img.naturalWidth && img.naturalHeight) {
         applyImageAspectRatio(img);
+      }
+    });
+  }
+
+  async function hydrateMissingTakeProfiles(rootEl, options) {
+    if (!rootEl || typeof rootEl.querySelectorAll !== "function") return;
+    const pendingArticles = rootEl.querySelectorAll(".take-item[data-needs-profile-user-id]");
+    if (!pendingArticles.length) return;
+
+    const userIds = [
+      ...new Set(
+        Array.from(pendingArticles)
+          .map((el) => el.getAttribute("data-needs-profile-user-id"))
+          .filter(Boolean)
+      ),
+    ];
+    if (!userIds.length) return;
+
+    let profiles = [];
+    if (window.ClashlyProfiles && typeof window.ClashlyProfiles.getProfilesByIds === "function") {
+      const res = await window.ClashlyProfiles.getProfilesByIds(userIds);
+      profiles = (res && res.profiles) || [];
+    } else if (window.ClashlyTakes && typeof window.ClashlyTakes.fetchProfilesByIds === "function") {
+      const res = await window.ClashlyTakes.fetchProfilesByIds(userIds);
+      profiles = (res && res.profiles) || [];
+    }
+
+    if (!profiles.length) return;
+    const profileMap = new Map(profiles.map((p) => [p.id, p]));
+
+    pendingArticles.forEach((article) => {
+      const uid = article.getAttribute("data-needs-profile-user-id");
+      const profile = profileMap.get(uid);
+      if (!profile || !profile.username) return;
+
+      article.removeAttribute("data-needs-profile-user-id");
+      const takeId = article.getAttribute("data-take-id");
+      if (takeId && renderedTakesMap.has(takeId)) {
+        const take = renderedTakesMap.get(takeId);
+        take.profile = {
+          id: profile.id,
+          username: profile.username,
+          avatar_url: profile.avatar_url || "",
+        };
+      }
+
+      const userLink = article.querySelector(".take-item__user");
+      if (userLink) {
+        userLink.textContent = profile.username;
+        const currentUserId = options && options.currentUserId ? String(options.currentUserId) : "";
+        if (currentUserId && uid === currentUserId) {
+          userLink.href = `profile.html?id=${encodeURIComponent(uid)}&u=${encodeURIComponent(profile.username)}`;
+        } else {
+          userLink.href = `user.html?id=${encodeURIComponent(uid)}&u=${encodeURIComponent(profile.username)}`;
+        }
+      }
+
+      const avatarContainer = article.querySelector(".take-item__avatar");
+      if (avatarContainer) {
+        if (profile.avatar_url) {
+          avatarContainer.innerHTML = `<img src="${window.ClashlyUtils.escapeHtml(
+            profile.avatar_url
+          )}" alt="${window.ClashlyUtils.escapeHtml(profile.username)} avatar" loading="lazy" decoding="async" />`;
+        } else {
+          const initials = window.ClashlyUtils.initialsFromName(profile.username);
+          avatarContainer.textContent = initials;
+        }
       }
     });
   }
@@ -1376,9 +1571,12 @@
         onPin: handlers.onPin,
         onShare: handlers.onShare,
         onDelete: handlers.onDelete,
-        onStatus: handlers.onStatus,
       });
     });
+  }
+
+  function clearCache() {
+    renderedTakesMap.clear();
   }
 
   window.ClashlyTakeRenderer = {
@@ -1400,5 +1598,7 @@
     confirmDeleteTake,
     applyImageAspectRatio,
     hydrateCachedImages,
+    hydrateMissingTakeProfiles,
+    clearCache,
   };
 })();

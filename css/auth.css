@@ -209,11 +209,12 @@
 }
 
 .auth-google-btn .app-icon,
-.auth-x-btn .app-icon {
+.auth-x-btn .app-icon,
+.auth-oauth__icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  font-size: 18px;
+  display: block;
 }
 
 /* ─── Form layout ────────────────────────────────────────────── */

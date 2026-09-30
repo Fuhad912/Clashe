@@ -39,6 +39,7 @@ test("permission starts in the click call and subscriptions can be enabled and d
       getClient: () => ({ functions: { invoke: async (_name, options) => {
         requests.push(options);
         if (options.method === "GET") return { data: { configured: true, publicKey: "AQID" }, error: null };
+        if (options.body?.action === "test") return { data: { sent: 1 }, error: null };
         return { data: {}, error: null };
       } } }),
     },
@@ -62,6 +63,9 @@ test("permission starts in the click call and subscriptions can be enabled and d
   assert.equal(subscription.endpoint, "https://push.example/device");
   assert.equal(win.ClashlyPush.isActiveOnThisDevice(), true);
   assert(requests.some((request) => request.body?.action === "subscribe"));
+  assert.equal((await win.ClashlyPush.getState()).enabled, true);
+  assert.equal((await win.ClashlyPush.sendTestNotification()).sent, 1);
+  assert(requests.some((request) => request.body?.action === "test"));
   await win.ClashlyPush.disable();
   assert.equal(subscription, null);
   assert.equal(win.ClashlyPush.isActiveOnThisDevice(), false);

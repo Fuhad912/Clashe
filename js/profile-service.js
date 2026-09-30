@@ -325,6 +325,51 @@
     return profile.pinned_take_id || readLocalPinnedTake(profile.id) || null;
   }
 
+  async function getProfilesByIds(userIds) {
+    const safeUserIds = [...new Set((userIds || []).filter(Boolean))];
+    if (!safeUserIds.length) return { profiles: [], error: null };
+
+    const cachedProfiles = getCachedProfilesByIds(safeUserIds);
+    const profileMap = new Map(cachedProfiles.map((p) => [p.id, p]));
+    const missingUserIds = safeUserIds.filter((id) => !profileMap.has(id));
+
+    if (!missingUserIds.length) {
+      return {
+        profiles: safeUserIds.map((id) => profileMap.get(id)).filter(Boolean),
+        error: null,
+      };
+    }
+
+    try {
+      const client = getClientOrThrow();
+      const { data, error } = await client
+        .from(PROFILES_TABLE)
+        .select(PROFILE_SELECT_BASE)
+        .in("id", missingUserIds);
+
+      if (error) {
+        return { profiles: Array.from(profileMap.values()), error };
+      }
+
+      const cached = cacheProfiles(data || []);
+      cached.forEach((p) => {
+        if (p && p.id) profileMap.set(p.id, p);
+      });
+
+      return {
+        profiles: safeUserIds.map((id) => profileMap.get(id)).filter(Boolean),
+        error: null,
+      };
+    } catch (err) {
+      return { profiles: Array.from(profileMap.values()), error: err };
+    }
+  }
+
+  function clearProfileCache() {
+    profileCacheById.clear();
+    profileCacheByUsername.clear();
+  }
+
   window.ClashlyProfiles = {
     PROFILES_TABLE,
     AVATAR_BUCKET,
@@ -332,9 +377,12 @@
     isUsernameValid,
     initialsFromUsername,
     cacheProfiles,
+    getCachedProfileById,
+    getCachedProfileByUsername,
     getProfileById,
     getProfileByUsername,
     getCachedProfilesByIds,
+    getProfilesByIds,
     hasCompletedProfile,
     isUsernameAvailable,
     uploadAvatar,
@@ -343,5 +391,6 @@
     markOnboardingSeenInDb,
     setPinnedTake,
     getPinnedTakeId,
+    clearProfileCache,
   };
 })();

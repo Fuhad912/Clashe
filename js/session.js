@@ -78,6 +78,21 @@
       const sessionState = await resolveSession();
       const user = sessionState.user;
 
+      if (window.ClasheCache) {
+        const prevUserId = window.ClasheCache.getActiveUserId();
+        const currentId = user ? user.id : "";
+        if (prevUserId && currentId && prevUserId !== currentId) {
+          window.ClasheCache.clearAll();
+          if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+            window.ClashlyTakeRenderer.clearCache();
+          }
+          if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+            window.ClashlyProfiles.clearProfileCache();
+          }
+        }
+        window.ClasheCache.setActiveUserId(currentId);
+      }
+
       if (!user) {
         if (context.page === PAGE_AUTH) return;
         if (context.requiresAuth) safeRedirect("auth.html");
@@ -97,6 +112,15 @@
     const context = getRouteContext();
 
     if (event === "SIGNED_OUT") {
+      if (window.ClasheCache) {
+        window.ClasheCache.clearAll();
+      }
+      if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+        window.ClashlyTakeRenderer.clearCache();
+      }
+      if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+        window.ClashlyProfiles.clearProfileCache();
+      }
       if (context.requiresAuth) {
         safeRedirect("auth.html");
       }
@@ -104,6 +128,19 @@
     }
 
     const user = session && session.user ? session.user : null;
+    if (user && window.ClasheCache) {
+      const prevUserId = window.ClasheCache.getActiveUserId();
+      if (prevUserId && prevUserId !== user.id) {
+        window.ClasheCache.clearAll();
+        if (window.ClashlyTakeRenderer && typeof window.ClashlyTakeRenderer.clearCache === "function") {
+          window.ClashlyTakeRenderer.clearCache();
+        }
+        if (window.ClashlyProfiles && typeof window.ClashlyProfiles.clearProfileCache === "function") {
+          window.ClashlyProfiles.clearProfileCache();
+        }
+      }
+      window.ClasheCache.setActiveUserId(user.id);
+    }
     if (!user) return;
     await resolveRedirectForAuthenticatedUser(user.id, context);
   }

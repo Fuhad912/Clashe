@@ -1116,3 +1116,98 @@
     padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
   }
 }
+/* The owner actions collapse into one menu on narrow profile screens. */
+#profile-feed .take-item__more-btn,
+#profile-feed .profile-grid-take__more {
+  display: none;
+}
+
+#profile-feed .profile-grid-take__share {
+  display: none;
+}
+
+@media (min-width: 641px) {
+  #profile-feed:not(.profile-feed--grid) .take-item__body {
+    position: relative;
+  }
+
+  #profile-feed:not(.profile-feed--grid) .take-item__meta {
+    padding-right: 44px;
+  }
+
+  #profile-feed:not(.profile-feed--grid) .take-item:has(.take-action--pin) .take-item__meta {
+    padding-right: 88px;
+  }
+
+  #profile-feed:not(.profile-feed--grid) .take-action--share,
+  #profile-feed:not(.profile-feed--grid) .take-action--pin {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  #profile-feed:not(.profile-feed--grid) .take-item:has(.take-action--pin) .take-action--share {
+    right: 44px;
+  }
+
+  #profile-feed .profile-grid-take__share {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.56);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  #profile-feed .profile-grid-take:has(.profile-grid-take__delete) .profile-grid-take__share {
+    right: 44px;
+  }
+
+  #profile-feed .profile-grid-take:has(.profile-grid-take__pin) .profile-grid-take__share {
+    right: 88px;
+  }
+}
+
+@media (max-width: 640px) {
+  #profile-feed.profile-feed--own .take-item__more-btn {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+  }
+
+  #profile-feed.profile-feed--own .take-action--pin,
+  #profile-feed.profile-feed--own .take-action--share,
+  #profile-feed.profile-feed--own .take-action--delete,
+  #profile-feed.profile-feed--own .profile-grid-take__pin,
+  #profile-feed.profile-feed--own .profile-grid-take__delete {
+    display: none;
+  }
+
+  #profile-feed.profile-feed--own .profile-grid-take__more {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    cursor: pointer;
+  }
+}

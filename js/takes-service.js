@@ -335,9 +335,30 @@
       };
     }
 
+    let authorProfile = null;
+    if (window.ClashlyProfiles && typeof window.ClashlyProfiles.getCachedProfileById === "function") {
+      authorProfile = window.ClashlyProfiles.getCachedProfileById(input.userId);
+    }
+    if (!authorProfile || !authorProfile.username) {
+      const profileRes = await fetchProfilesByIds([input.userId]);
+      if (profileRes && profileRes.profiles && profileRes.profiles.length > 0) {
+        authorProfile = profileRes.profiles[0];
+      }
+    }
+
+    const resolvedProfile = {
+      id: input.userId,
+      username: (authorProfile && authorProfile.username) || "",
+      avatar_url: (authorProfile && authorProfile.avatar_url) || "",
+    };
+
     return {
       take: normalizeTakeMedia({
         ...(insertResult.data || {}),
+        profile: resolvedProfile,
+        vote: defaultVoteSummary(),
+        comment_count: 0,
+        bookmarked: false,
         hashtags: hashtagResult.hashtags || [],
         category: categoryResult.category || null,
       }),
@@ -611,8 +632,11 @@
     let disagree = Number(currentVote.disagree_count || 0);
     let userVote = safeCurrentVote;
 
-    if (safeCurrentVote === safeNextVoteType) {
-      return createVoteSummary(agree, disagree, userVote);
+    if (safeCurrentVote === safeNextVoteType && safeCurrentVote) {
+      // Toggle off / deselect vote
+      if (safeCurrentVote === "agree") agree = Math.max(0, agree - 1);
+      if (safeCurrentVote === "disagree") disagree = Math.max(0, disagree - 1);
+      userVote = "";
     } else {
       if (safeCurrentVote === "agree") agree = Math.max(0, agree - 1);
       if (safeCurrentVote === "disagree") disagree = Math.max(0, disagree - 1);
@@ -850,6 +874,30 @@
     }
 
     const takes = mapRpcFeedRows(rpcResult.data || []);
+
+    const missingUserIds = takes
+      .filter((take) => take && take.user_id && (!take.profile || !take.profile.username))
+      .map((take) => take.user_id);
+
+    if (missingUserIds.length > 0) {
+      const profilesResult = await fetchProfilesByIds(missingUserIds);
+      if (profilesResult && profilesResult.profiles && profilesResult.profiles.length > 0) {
+        const profileMap = new Map(profilesResult.profiles.map((p) => [p.id, p]));
+        takes.forEach((take) => {
+          if (take && take.user_id && (!take.profile || !take.profile.username)) {
+            const found = profileMap.get(take.user_id);
+            if (found) {
+              take.profile = {
+                id: found.id,
+                username: found.username || "",
+                avatar_url: found.avatar_url || "",
+              };
+            }
+          }
+        });
+      }
+    }
+
     const nextCursor = buildNextCursor(rpcResult.data || [], limit);
     return {
       takes,
@@ -1729,7 +1777,16 @@
 
     const currentVote = normalizeVoteType(input.currentVote);
     if (currentVote && currentVote === safeVoteType) {
-      return fetchVoteSummaryForTake(input.takeId, input.userId);
+      // Toggle off / deselect existing vote
+      const deleteResult = await client
+        .from(VOTES_TABLE)
+        .delete()
+        .eq("user_id", input.userId)
+        .eq("take_id", input.takeId);
+
+      if (deleteResult.error) {
+        return { vote: defaultVoteSummary(), error: deleteResult.error };
+      }
     } else {
       const upsertResult = await client.from(VOTES_TABLE).upsert(
         {
@@ -1841,5 +1898,6 @@
     resolveSubmittedVoteSummary,
     toggleBookmark,
     deleteTake,
+    fetchProfilesByIds,
   };
 })();

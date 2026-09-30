@@ -41,7 +41,7 @@ function notificationUrl(row: Record<string, unknown>): string {
   const takeId = clean(row.target_take_id || row.target_id, 128);
   const commentId = clean(row.target_comment_id, 128);
   if (!takeId) return "notifications.html";
-  const url = `take.html?id=${encodeURIComponent(takeId)}`;
+  const url = `take.html?id=${encodeURIComponent(takeId)}&from=notifications`;
   return commentId ? `${url}&commentId=${encodeURIComponent(commentId)}` : url;
 }
 
@@ -109,6 +109,37 @@ Deno.serve(async (request) => {
     return error ? json({ error: "Could not remove subscription." }, 500) : json({ enabled: false });
   }
 
+  if (action === "test") {
+    const { data: subscriptions, error } = await admin.from("push_subscriptions")
+      .select("endpoint, p256dh, auth_secret").eq("user_id", userId).limit(20);
+    if (error) return json({ error: "Could not load your push subscriptions." }, 500);
+    if (!subscriptions?.length) return json({ error: "No device subscription is saved. Turn notifications off and on again." }, 404);
+
+    webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
+    let sent = 0;
+    let lastError = "";
+    await Promise.all(subscriptions.map(async (subscription) => {
+      try {
+        await webpush.sendNotification({
+          endpoint: subscription.endpoint,
+          keys: { p256dh: subscription.p256dh, auth: subscription.auth_secret },
+        }, JSON.stringify({
+          title: "Clashe",
+          body: "Test notification delivered. New activity alerts should appear here.",
+          url: "notifications.html",
+        }), { TTL: 60, urgency: "high" });
+        sent += 1;
+      } catch (pushError) {
+        const status = Number((pushError as { statusCode?: number }).statusCode || 0);
+        lastError = status ? `Push provider rejected delivery (${status}).` : "Push provider could not be reached.";
+        if (status === 404 || status === 410) {
+          await admin.from("push_subscriptions").delete().eq("endpoint", subscription.endpoint);
+        }
+      }
+    }));
+    return sent ? json({ sent }) : json({ error: lastError || "No push was accepted." }, 502);
+  }
+
   if (action !== "send") return json({ error: "Unknown action." }, 400);
   const notificationId = clean(input.notificationId, 128);
   if (!notificationId) return json({ error: "Missing notification." }, 400);
@@ -141,10 +172,14 @@ Deno.serve(async (request) => {
   webpush.setVapidDetails(config.subject, config.publicKey, config.privateKey);
 
   let sent = 0;
+  let deliveryError = "";
   await Promise.all(subscriptions.map(async (subscription) => {
     const endpoint = subscription.endpoint;
     const { error: claimError } = await admin.from("push_deliveries").insert({ notification_id: String(row.id), endpoint });
-    if (claimError) return; // A prior request already claimed this device.
+    if (claimError) {
+      if (claimError.code !== "23505") deliveryError = "Could not record the push delivery attempt.";
+      return; // A prior request may already have claimed this device.
+    }
     try {
       await webpush.sendNotification({
         endpoint,
@@ -159,8 +194,10 @@ Deno.serve(async (request) => {
         // Allow a retry after a transient delivery failure.
         await admin.from("push_deliveries").delete().eq("notification_id", String(row.id)).eq("endpoint", endpoint);
       }
+      deliveryError = status ? `Push provider rejected delivery (${status}).` : "Push provider could not be reached.";
       console.warn("[Clashe Push] Delivery failed:", status || "network error");
     }
   }));
-  return json({ sent });
+  if (deliveryError && !sent) return json({ error: deliveryError }, 502);
+  return json({ sent, attempted: subscriptions.length });
 });

@@ -19,4 +19,6 @@ The app includes the browser opt-in, service-worker notification display, subscr
 
 Test with two accounts and a second installed device: enable App Notifications in Settings on the recipient device, close the app, then have the other account follow or comment. A system notification should appear and open the relevant profile or take. On iPhone and iPad, open the installed Home Screen app before enabling notifications. Browser permission must be granted from the user's tap; the app never requests it automatically.
 
+After deploying a change to `clashe-push`, open Settings on the subscribed device and use **Send test notification**. This checks the saved subscription and the push provider without needing a second account. If the test succeeds but activity alerts do not, check that the `on_notification_created_push` trigger exists, both Vault secrets are present, and new activity creates rows in `public.notifications`. The in-app notifications page can derive activity even when no notification row was inserted; derived entries cannot trigger the push webhook.
+
 Expired browser subscriptions are removed after a 404/410 response. The device's subscription is removed on opt-out or sign-out. Periodically prune old rows from `push_deliveries` with the maintenance query in `push_notifications.sql`.

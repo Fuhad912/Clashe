@@ -567,17 +567,17 @@
 
     if (notification.type === "comment_like") {
       if (!targetTakeId) return "notifications.html";
-      const takeUrl = `take.html?id=${encodeURIComponent(targetTakeId)}`;
+      const takeUrl = `take.html?id=${encodeURIComponent(targetTakeId)}&from=notifications`;
       return targetCommentId ? `${takeUrl}&commentId=${encodeURIComponent(targetCommentId)}` : takeUrl;
     }
 
     if (targetTakeId) {
-      const takeUrl = `take.html?id=${encodeURIComponent(targetTakeId)}`;
+      const takeUrl = `take.html?id=${encodeURIComponent(targetTakeId)}&from=notifications`;
       return targetCommentId ? `${takeUrl}&commentId=${encodeURIComponent(targetCommentId)}` : takeUrl;
     }
 
     if (notification.target_id) {
-      return `take.html?id=${encodeURIComponent(notification.target_id)}`;
+      return `take.html?id=${encodeURIComponent(notification.target_id)}&from=notifications`;
     }
 
     return "notifications.html";
