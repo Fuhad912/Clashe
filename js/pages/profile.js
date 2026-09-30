@@ -267,6 +267,12 @@
     if (type === "success") statusEl.classList.add("is-success");
   }
 
+  function updateEditProfileBioCount() {
+    const bioInput = document.getElementById("edit-profile-bio");
+    const countEl = document.getElementById("edit-profile-bio-count");
+    if (bioInput && countEl) countEl.textContent = `${bioInput.value.length} / 280`;
+  }
+
   function closeEditProfileModal() {
     const modal = document.getElementById("edit-profile-modal");
     if (!modal) return;
@@ -317,6 +323,7 @@
 
     if (usernameInput) usernameInput.value = currentProfile.username || "";
     if (bioInput) bioInput.value = currentProfile.bio || "";
+    updateEditProfileBioCount();
     if (dobInput) dobInput.value = currentProfile.date_of_birth || "";
     if (avatarInput) avatarInput.value = "";
 
@@ -1611,6 +1618,12 @@
     }
 
     const editAvatarInput = document.getElementById("edit-profile-avatar-input");
+    const editAvatarUpload = document.getElementById("edit-profile-avatar-upload");
+    if (editAvatarUpload && editAvatarInput) {
+      editAvatarUpload.addEventListener("click", () => editAvatarInput.click());
+    }
+    const editBioInput = document.getElementById("edit-profile-bio");
+    if (editBioInput) editBioInput.addEventListener("input", updateEditProfileBioCount);
     if (editAvatarInput) {
       editAvatarInput.addEventListener("change", () => {
         const file = editAvatarInput.files && editAvatarInput.files[0];
