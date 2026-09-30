@@ -644,6 +644,9 @@
           }
 
           setStatus("Profile saved. Redirecting to Clashe...", "success");
+          try {
+            window.localStorage.setItem(`clashe-onboarding-pending:${user.id}`, "1");
+          } catch (_error) {}
           redirectToHome();
         } catch (error) {
           window.ClashlyUtils.reportError("Profile setup submit failed.", error, "Unable to complete setup.");

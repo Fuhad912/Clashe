@@ -7,6 +7,7 @@
   const ONBOARDING_MODAL_ID = "onboarding-modal";
   const ONBOARDING_STORAGE_KEY_PREFIX = "clashe-onboarding-seen";
   const ONBOARDING_STEP_KEY_PREFIX = "clashe-onboarding-step";
+  const ONBOARDING_PENDING_KEY_PREFIX = "clashe-onboarding-pending";
   const DEFAULT_PREVIEW_TEXT = "Image preview area";
   const NOTIFICATIONS_DRAWER_ID = "notifications-drawer";
   const DESKTOP_NOTIFICATIONS_QUERY = "(min-width: 1025px)";
@@ -753,6 +754,18 @@
     return `${ONBOARDING_STEP_KEY_PREFIX}:${userId}`;
   }
 
+  function hasPendingOnboarding(userId) {
+    try {
+      return window.localStorage.getItem(`${ONBOARDING_PENDING_KEY_PREFIX}:${userId}`) === "1";
+    } catch (_error) { return false; }
+  }
+
+  function clearPendingOnboarding(userId) {
+    try {
+      window.localStorage.removeItem(`${ONBOARDING_PENDING_KEY_PREFIX}:${userId}`);
+    } catch (_error) {}
+  }
+
   function readOnboardingStep(userId) {
     try {
       const step = Number(window.localStorage.getItem(getOnboardingStepKey(userId)) || 0);
@@ -796,25 +809,30 @@
 
   async function hasSeenOnboarding(userId) {
     if (!userId) return true;
-    if (hasSeenOnboardingLocally(userId)) return true;
+    if (hasSeenOnboardingLocally(userId)) {
+      clearPendingOnboarding(userId);
+      return true;
+    }
     if (window.ClashlyProfiles) {
       try {
         const { seen, error } = await window.ClashlyProfiles.hasSeenOnboardingInDb(userId);
-        if (error) return null;
+        if (error) return hasPendingOnboarding(userId) ? false : null;
         if (seen) {
           setSeenOnboardingLocally(userId);
+          clearPendingOnboarding(userId);
           return true;
         }
         return false;
-      } catch (_err) { return null; }
+      } catch (_err) { return hasPendingOnboarding(userId) ? false : null; }
     }
-    return null;
+    return hasPendingOnboarding(userId) ? false : null;
   }
 
   function markOnboardingSeen(userId) {
     if (!userId) return;
     setSeenOnboardingLocally(userId);
     clearOnboardingStep(userId);
+    clearPendingOnboarding(userId);
     if (window.ClashlyProfiles) {
       window.ClashlyProfiles.markOnboardingSeenInDb(userId).catch(() => {});
     }
@@ -898,7 +916,9 @@
   function closeOnboardingModal(options = {}) {
     const modal = getOnboardingModal();
     if (!modal || modal.hidden) return;
-    if (options.complete) markOnboardingSeen(onboardingActiveUserId);
+    if (options.complete && (!onboardingIsReplay || !hasSeenOnboardingLocally(onboardingActiveUserId))) {
+      markOnboardingSeen(onboardingActiveUserId);
+    }
     modal.hidden = true;
     document.body.classList.remove("has-onboarding-open");
     onboardingActiveUserId = "";
@@ -967,7 +987,7 @@
         if (event.shiftKey && (document.activeElement === first || document.activeElement === modal.querySelector("#onboarding-title"))) {
           event.preventDefault();
           last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
+        } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === modal.querySelector("#onboarding-title"))) {
           event.preventDefault();
           first.focus();
         }
