@@ -537,8 +537,7 @@
       <div class="top-nav__inner">
         <a class="brand" href="index.html" aria-label="Clashe home">
           <span class="brand__mark" aria-hidden="true">
-            <img src="assets/Lightmode_logo.svg" alt="Clashe" class="theme-logo theme-logo--light" />
-            <img src="assets/Darkmode_logo.svg" alt="Clashe" class="theme-logo theme-logo--dark" />
+            <img src="assets/${document.documentElement.dataset.theme === "dark" ? "Darkmode_logo.svg" : "Lightmode_logo.svg"}" alt="" data-theme-logo />
           </span>
           <span>Clashe</span>
         </a>
@@ -1280,11 +1279,86 @@
     count.textContent = `${textarea.value.length} / ${window.ClashlyTakes.MAX_CONTENT_LENGTH}`;
   }
 
+  function getMimeTypeForImageFile(file) {
+    if (file && typeof file.type === "string" && file.type.startsWith("image/")) {
+      return file.type;
+    }
+    const name = ((file && file.name) || "").toLowerCase();
+    if (name.endsWith(".png")) return "image/png";
+    if (name.endsWith(".webp")) return "image/webp";
+    if (name.endsWith(".gif")) return "image/gif";
+    return "image/jpeg";
+  }
+
+  function createSafeImagePreviewUrl(file) {
+    if (!file) return "";
+    const mimeType = getMimeTypeForImageFile(file);
+    try {
+      if (!file.type || !file.type.startsWith("image/")) {
+        const safeBlob = file.slice(0, file.size, mimeType);
+        return URL.createObjectURL(safeBlob);
+      }
+      return URL.createObjectURL(file);
+    } catch (_) {
+      try {
+        return URL.createObjectURL(file);
+      } catch (_err) {
+        return "";
+      }
+    }
+  }
+
+  function showPreviewFallbackBadge(imgEl, file) {
+    const parent = imgEl.parentElement;
+    if (!parent) return;
+    const fileName = (file && file.name) || "Image";
+    const badge = document.createElement("div");
+    badge.className = "image-preview-fallback";
+    badge.innerHTML = `
+      <i class="app-icon fa-solid fa-image" aria-hidden="true"></i>
+      <span class="image-preview-fallback__name">${window.ClashlyUtils ? window.ClashlyUtils.escapeHtml(fileName) : fileName}</span>
+      <span class="image-preview-fallback__badge">Attached</span>
+    `;
+    imgEl.replaceWith(badge);
+  }
+
+  function attachPreviewImageFallback(imgEl, file) {
+    if (!imgEl || !file) return;
+
+    imgEl.addEventListener(
+      "error",
+      function onImgError() {
+        if (imgEl.dataset.fallbackTried === "true") return;
+        imgEl.dataset.fallbackTried = "true";
+
+        try {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            if (e.target && e.target.result) {
+              imgEl.src = e.target.result;
+            } else {
+              showPreviewFallbackBadge(imgEl, file);
+            }
+          };
+          reader.onerror = function () {
+            showPreviewFallbackBadge(imgEl, file);
+          };
+          reader.readAsDataURL(file);
+        } catch (_) {
+          showPreviewFallbackBadge(imgEl, file);
+        }
+      },
+      { once: true }
+    );
+  }
+
   function resetCreatePreview() {
     const { preview } = getCreateModalElements();
     if (!preview) return;
     const objectUrls = JSON.parse(preview.dataset.objectUrls || "[]");
-    objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+    objectUrls.forEach((objectUrl) => {
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+    });
     delete preview.dataset.objectUrls;
 
     preview.classList.remove("has-image");
@@ -1302,26 +1376,43 @@
       return;
     }
 
-    const objectUrls = safeFiles.map((file) => URL.createObjectURL(file));
+    const objectUrls = safeFiles.map((file) => createSafeImagePreviewUrl(file));
     preview.dataset.objectUrls = JSON.stringify(objectUrls);
     preview.classList.add("has-image");
 
-    if (objectUrls.length === 1) {
+    if (safeFiles.length === 1) {
       preview.classList.remove("image-preview-placeholder--split");
-      preview.innerHTML = `<img src="${objectUrls[0]}" alt="Selected upload preview" />`;
+      preview.innerHTML = `
+        <div class="image-preview-placeholder__slot image-preview-placeholder__slot--single">
+          <img src="${objectUrls[0]}" alt="Selected upload preview" />
+          <button type="button" class="image-preview-remove" data-remove-index="0" aria-label="Remove image">
+            <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </div>
+      `;
+      const img = preview.querySelector("img");
+      if (img) attachPreviewImageFallback(img, safeFiles[0]);
       return;
     }
 
     preview.classList.add("image-preview-placeholder--split");
-    preview.innerHTML = objectUrls
+    preview.innerHTML = safeFiles
       .map(
-        (objectUrl, index) => `
+        (file, index) => `
           <div class="image-preview-placeholder__slot">
-            <img src="${objectUrl}" alt="Selected upload preview ${index + 1}" />
+            <img src="${objectUrls[index]}" alt="Selected upload preview ${index + 1}" />
+            <button type="button" class="image-preview-remove" data-remove-index="${index}" aria-label="Remove image ${index + 1}">
+              <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
           </div>
         `
       )
       .join("");
+
+    const imgs = preview.querySelectorAll("img");
+    imgs.forEach((img, idx) => {
+      attachPreviewImageFallback(img, safeFiles[idx]);
+    });
   }
 
   function mergeSelectedFiles(existingFiles, incomingFiles, maxFiles) {
@@ -1459,6 +1550,20 @@
       renderCreatePreview(createModalSelectedFiles);
       elements.imageInput.value = "";
       setCreateStatus("", "");
+    });
+
+    elements.preview.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-remove-index]");
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const idx = Number(btn.getAttribute("data-remove-index"));
+      if (!Number.isNaN(idx) && idx >= 0 && idx < createModalSelectedFiles.length) {
+        createModalSelectedFiles.splice(idx, 1);
+        resetCreatePreview();
+        renderCreatePreview(createModalSelectedFiles);
+        setCreateStatus("", "");
+      }
     });
 
     elements.form.addEventListener("submit", async (event) => {

@@ -49,11 +49,15 @@
 .clashe-loader__mark {
   width: 96px;
   height: 96px;
-  background-image: url("../assets/clashly-mark.svg");
+  background-image: url("../assets/Lightmode_logo.svg");
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
   animation: clashe-loader-pulse 1.2s ease-in-out infinite;
+}
+
+:root[data-theme="dark"] .clashe-loader__mark {
+  background-image: url("../assets/Darkmode_logo.svg");
 }
 
 .clashe-loader__wordmark {

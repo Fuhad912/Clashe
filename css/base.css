@@ -37,6 +37,23 @@ img {
   height: auto;
 }
 
+/* The logo artwork follows the app's selected theme, including on auth pages. */
+.theme-logo.theme-logo--dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-logo.theme-logo--light {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-logo.theme-logo--dark {
+  display: block;
+}
+
+:root .feed-empty-visual__mark.theme-logo {
+  display: none;
+}
+
 a {
   color: inherit;
   text-decoration: none;

@@ -4,6 +4,8 @@
   const DARK = "dark";
   const MANIFEST_HREF = "manifest.json";
   const APPLE_TOUCH_ICON_HREF = "assets/pwa-192.png";
+  const FAVICON_LIGHT_HREF = "assets/Lightmode_logo.svg";
+  const FAVICON_DARK_HREF = "assets/Darkmode_logo.svg";
   const THEME_COLOR_LIGHT = "#f5f5f7";
   const THEME_COLOR_DARK = "#0d0e10";
 
@@ -23,6 +25,9 @@
   function applyTheme(theme) {
     const nextTheme = theme === DARK ? DARK : LIGHT;
     document.documentElement.dataset.theme = nextTheme;
+    document.querySelectorAll("[data-theme-logo]").forEach((logo) => {
+      logo.src = nextTheme === DARK ? FAVICON_DARK_HREF : FAVICON_LIGHT_HREF;
+    });
 
     try {
       window.localStorage.setItem(STORAGE_KEY, nextTheme);
@@ -98,6 +103,9 @@
 
   function syncThemeChrome(theme) {
     ensureMeta("theme-color", theme === DARK ? THEME_COLOR_DARK : THEME_COLOR_LIGHT);
+    const icons = Array.from(document.head.querySelectorAll('link[rel="icon"]'));
+    icons.slice(0, -1).forEach((icon) => icon.remove());
+    ensureHeadLink("icon", theme === DARK ? FAVICON_DARK_HREF : FAVICON_LIGHT_HREF, { type: "image/svg+xml" });
   }
 
   function bindToggle() {
@@ -110,6 +118,8 @@
   }
 
   function boot() {
+    // Static HTML links are parsed after this script, so sync once more here.
+    syncThemeChrome(getActiveTheme());
     updateToggleLabel();
   }
 
