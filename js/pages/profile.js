@@ -283,6 +283,7 @@
         modal.hidden = true;
         document.body.style.overflow = "";
         setEditProfileStatus("", "");
+        document.getElementById("edit-profile-trigger")?.focus();
 
         if (editProfileAvatarObjectUrl) {
           URL.revokeObjectURL(editProfileAvatarObjectUrl);

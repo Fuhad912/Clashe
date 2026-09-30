@@ -661,7 +661,10 @@
                 <i class="app-icon fa-solid fa-ellipsis" aria-hidden="true"></i>
               </button>
             </div>
-            <div class="trend-item__keyword">${safeKeyword}</div>
+            <div class="trend-item__keyword">
+              <i class="app-icon fa-solid fa-arrow-trend-up trend-item__trend-icon" aria-hidden="true"></i>
+              <span class="trend-item__keyword-text">${safeKeyword}</span>
+            </div>
           </div>
         `;
       })

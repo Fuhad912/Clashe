@@ -196,7 +196,7 @@
     const session = window.ClashlySession && await window.ClashlySession.resolveSession();
     if (!session?.user) return;
     const state = await getState();
-    if (!state.configured || state.enabled || document.body.classList.contains("has-onboarding-open")) return;
+    if (!state.configured || state.enabled || document.body.classList.contains("has-onboarding-open") || document.body.classList.contains("has-onboarding-pending")) return;
 
     const prompt = document.createElement("aside");
     prompt.id = PROMPT_ID;

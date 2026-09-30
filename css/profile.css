@@ -816,6 +816,11 @@
 }
 
 @media (max-width: 640px) {
+  .edit-profile-modal:not([hidden]) {
+    display: flex;
+    align-items: flex-end;
+  }
+
   .edit-profile-modal__panel,
   .follow-list-modal__panel {
     width: 100%;
@@ -824,6 +829,10 @@
     border-radius: 20px 20px 0 0;
     border-left: 0;
     border-right: 0;
+  }
+
+  .edit-profile-modal__panel {
+    margin: 0;
   }
 
   .edit-profile-modal__head,

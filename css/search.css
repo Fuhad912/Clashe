@@ -218,12 +218,29 @@
 }
 
 .trend-item__keyword {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 0.98rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--color-text);
   line-height: 1.3;
   margin-bottom: 2px;
+}
+
+.trend-item__trend-icon {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: transform var(--transition-base), color var(--transition-base);
+}
+
+.trend-item:hover .trend-item__trend-icon,
+.trend-item:focus-visible .trend-item__trend-icon {
+  color: var(--color-agree);
+  transform: translateY(-1px) translateX(1px);
 }
 
 /* .trend-item__stat removed — trending items no longer display volume labels */

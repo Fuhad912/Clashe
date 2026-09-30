@@ -6,23 +6,51 @@
   const CREATE_MODAL_ID = "create-modal";
   const ONBOARDING_MODAL_ID = "onboarding-modal";
   const ONBOARDING_STORAGE_KEY_PREFIX = "clashe-onboarding-seen";
+  const ONBOARDING_STEP_KEY_PREFIX = "clashe-onboarding-step";
   const DEFAULT_PREVIEW_TEXT = "Image preview area";
   const NOTIFICATIONS_DRAWER_ID = "notifications-drawer";
   const DESKTOP_NOTIFICATIONS_QUERY = "(min-width: 1025px)";
   const SERVICE_WORKER_PATH = "sw.js";
   const PWA_STATE_EVENT = "clashly:pwa-state";
-  const ONBOARDING_ENABLED_PAGES = new Set([
-    "home",
-    "explore",
-    "search",
-    "notifications",
-    "profile",
-    "settings",
-    "take",
-    "category",
-    "hashtag",
-    "create",
-  ]);
+  const ONBOARDING_ENABLED_PAGES = new Set(["home", "settings"]);
+  const ONBOARDING_STEPS = [
+    {
+      label: "Explore",
+      title: "Find a take worth your time",
+      copy: "Browse the feed for fresh opinions, or search for takes and people who challenge your thinking.",
+      visual: `<div class="onboarding-demo onboarding-demo--feed" aria-hidden="true">
+        <div class="onboarding-demo__tabs"><span class="is-active">Top</span><span>Takes</span><span>People</span></div>
+        <div class="onboarding-demo__take"><span class="onboarding-demo__avatar">C</span><div><strong>@clashe</strong><p>Is a bold opinion better than playing it safe?</p><small>Discussion · 24 replies</small></div></div>
+      </div>`,
+    },
+    {
+      label: "Join in",
+      title: "Vote, then add your reasoning",
+      copy: "Agree or disagree with a take, and use the comments to explain your view. The conversation gets better when you say why.",
+      visual: `<div class="onboarding-demo onboarding-demo--vote" aria-hidden="true">
+        <p class="onboarding-demo__question">Would you trade convenience for more privacy?</p>
+        <div class="onboarding-demo__votes"><span>Agree <strong>64%</strong></span><span>Disagree <strong>36%</strong></span></div>
+        <div class="onboarding-demo__comment"><span class="onboarding-demo__avatar">Y</span><span>I'd choose privacy, especially for personal data.</span></div>
+      </div>`,
+    },
+    {
+      label: "Connect",
+      title: "Find your people",
+      copy: "Search for people with interesting perspectives and follow them. Their new takes will help shape your feed.",
+      visual: `<div class="onboarding-demo onboarding-demo--people" aria-hidden="true">
+        <div class="onboarding-demo__person"><span class="onboarding-demo__avatar">A</span><span><strong>@alex</strong><small>Tech, culture, and everything between</small></span><em>Follow</em></div>
+        <div class="onboarding-demo__person"><span class="onboarding-demo__avatar">J</span><span><strong>@jordan</strong><small>Questions worth arguing about</small></span><em>Follow</em></div>
+      </div>`,
+    },
+    {
+      label: "Create",
+      title: "Now drop your first take",
+      copy: "Lead with one clear opinion. Give people something specific to agree with, challenge, or discuss.",
+      visual: `<div class="onboarding-demo onboarding-demo--create" aria-hidden="true">
+        <span class="onboarding-demo__draft-label">New take</span><p>Here's a take: the best ideas survive a good debate.</p><span class="onboarding-demo__draft-action">Post Take <i class="app-icon fa-solid fa-arrow-right"></i></span>
+      </div>`,
+    },
+  ];
   let bottomNavResizeObserver = null;
   let notificationsUserId = "";
   let notificationsItems = [];
@@ -34,6 +62,10 @@
   const NOTIFICATION_SEEN_PREFIX = "clashe-notification-banner-seen:";
   let onboardingActiveUserId = "";
   let onboardingShownForUserId = "";
+  let onboardingCurrentUserId = "";
+  let onboardingStep = 0;
+  let onboardingIsReplay = false;
+  let onboardingReturnFocus = null;
   let deferredInstallPrompt = null;
   let createModalSelectedFiles = [];
   let createModalCategoryPicker = null;
@@ -370,7 +402,7 @@
   }
 
   function showNotificationBanner(item, count) {
-    if (document.hidden || document.body.classList.contains("has-onboarding-open") ||
+    if (document.hidden || document.body.classList.contains("has-onboarding-open") || document.body.classList.contains("has-onboarding-pending") ||
       (window.ClashlyPush && window.ClashlyPush.isActiveOnThisDevice())) return;
     dismissNotificationBanner();
     const banner = document.createElement("div");
@@ -717,6 +749,33 @@
     return `${ONBOARDING_STORAGE_KEY_PREFIX}:${userId}`;
   }
 
+  function getOnboardingStepKey(userId) {
+    return `${ONBOARDING_STEP_KEY_PREFIX}:${userId}`;
+  }
+
+  function readOnboardingStep(userId) {
+    try {
+      const step = Number(window.localStorage.getItem(getOnboardingStepKey(userId)) || 0);
+      return Number.isInteger(step) && step >= 0 && step < ONBOARDING_STEPS.length ? step : 0;
+    } catch (_error) {
+      return 0;
+    }
+  }
+
+  function saveOnboardingStep(userId, step) {
+    if (!userId) return;
+    try {
+      window.localStorage.setItem(getOnboardingStepKey(userId), String(step));
+    } catch (_error) {}
+  }
+
+  function clearOnboardingStep(userId) {
+    if (!userId) return;
+    try {
+      window.localStorage.removeItem(getOnboardingStepKey(userId));
+    } catch (_error) {}
+  }
+
   function hasSeenOnboardingLocally(userId) {
     if (!userId) return false;
     try {
@@ -737,29 +796,25 @@
 
   async function hasSeenOnboarding(userId) {
     if (!userId) return true;
-    // Fast path: already cached locally on this device.
     if (hasSeenOnboardingLocally(userId)) return true;
-    // Slow path: check the database so returning users on new browsers
-    // are not shown the modal again.
     if (window.ClashlyProfiles) {
       try {
-        const { seen } = await window.ClashlyProfiles.hasSeenOnboardingInDb(userId);
+        const { seen, error } = await window.ClashlyProfiles.hasSeenOnboardingInDb(userId);
+        if (error) return null;
         if (seen) {
-          // Cache locally so future checks are instant.
           setSeenOnboardingLocally(userId);
           return true;
         }
-      } catch (_err) {
-        // Network error — fall through and show modal (safe default).
-      }
+        return false;
+      } catch (_err) { return null; }
     }
-    return false;
+    return null;
   }
 
   function markOnboardingSeen(userId) {
     if (!userId) return;
     setSeenOnboardingLocally(userId);
-    // Write to DB in the background — don't block the UI.
+    clearOnboardingStep(userId);
     if (window.ClashlyProfiles) {
       window.ClashlyProfiles.markOnboardingSeenInDb(userId).catch(() => {});
     }
@@ -768,46 +823,30 @@
   function getOnboardingModalMarkup() {
     return `
       <div id="${ONBOARDING_MODAL_ID}" class="onboarding-modal" hidden>
-        <button
-          type="button"
-          class="onboarding-modal__backdrop"
-          aria-label="Close onboarding guide"
-          data-close-onboarding="true"
-        ></button>
-        <section class="onboarding-modal__panel" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+        <button type="button" class="onboarding-modal__backdrop" aria-label="Close tutorial and resume later" data-onboarding-action="close"></button>
+        <section class="onboarding-modal__panel" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" aria-describedby="onboarding-copy">
           <header class="onboarding-modal__head">
-            <button
-              type="button"
-              class="onboarding-modal__close"
-              aria-label="Close onboarding guide"
-              data-close-onboarding="true"
-            >
-              X
-            </button>
-            <div class="onboarding-modal__intro">
-              <p class="onboarding-modal__kicker">Welcome to Clashe</p>
-              <h2 id="onboarding-title" class="onboarding-modal__title">Quick start guide</h2>
-            </div>
+            <span class="onboarding-modal__brand"><span class="onboarding-modal__brand-mark"><i class="app-icon fa-solid fa-bolt" aria-hidden="true"></i></span> Clashe</span>
+            <button type="button" class="onboarding-modal__close" aria-label="Close tutorial and resume later" data-onboarding-action="close"><i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i></button>
           </header>
-          <p class="onboarding-modal__copy">
-            Clashe is built for sharp takes and clear debate. Here is how to get started.
-          </p>
-          <ul class="onboarding-modal__list">
-            <li>
-              <strong>Post your take</strong>
-              <span>Share one clear opinion to start a focused discussion.</span>
-            </li>
-            <li>
-              <strong>Vote and discuss</strong>
-              <span>Use agree/disagree and comments to push arguments forward.</span>
-            </li>
-            <li>
-              <strong>Follow the best thinkers</strong>
-              <span>Build a feed around people and topics you care about.</span>
-            </li>
-          </ul>
+          <div class="onboarding-modal__visual" id="onboarding-visual"></div>
+          <div class="onboarding-modal__content">
+            <p class="onboarding-modal__kicker" id="onboarding-step-label"></p>
+            <h2 id="onboarding-title" class="onboarding-modal__title" tabindex="-1"></h2>
+            <p id="onboarding-copy" class="onboarding-modal__copy"></p>
+          </div>
+          <div class="onboarding-modal__progress" role="group" aria-label="Tutorial progress">
+            <span id="onboarding-step-count" class="onboarding-modal__step-count"></span>
+            <span id="onboarding-progress-dots" class="onboarding-modal__dots" aria-hidden="true"></span>
+          </div>
           <footer class="onboarding-modal__actions">
-            <button type="button" class="btn btn--primary" data-close-onboarding="true">Start exploring</button>
+            <button type="button" class="onboarding-modal__skip" data-onboarding-action="skip">Skip tutorial</button>
+            <div class="onboarding-modal__nav-actions">
+              <button type="button" class="btn btn--ghost" data-onboarding-action="back" hidden>Back</button>
+              <button type="button" class="btn btn--primary" data-onboarding-action="next">Next <i class="app-icon fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+              <button type="button" class="btn btn--ghost" data-onboarding-action="explore" hidden>Explore feed</button>
+              <button type="button" class="btn btn--primary" data-onboarding-action="create" hidden>Write my first take</button>
+            </div>
           </footer>
         </section>
       </div>
@@ -823,33 +862,67 @@
     return document.getElementById(ONBOARDING_MODAL_ID);
   }
 
-  function openOnboardingModal(userId) {
+  function renderOnboardingStep() {
     const modal = getOnboardingModal();
-    if (!modal || !userId) return;
+    if (!modal) return;
+    const step = ONBOARDING_STEPS[onboardingStep];
+    modal.querySelector("#onboarding-visual").innerHTML = step.visual;
+    modal.querySelector("#onboarding-step-label").textContent = step.label;
+    modal.querySelector("#onboarding-title").textContent = step.title;
+    modal.querySelector("#onboarding-copy").textContent = step.copy;
+    modal.querySelector("#onboarding-step-count").textContent = `${onboardingStep + 1} of ${ONBOARDING_STEPS.length}`;
+    modal.querySelector("#onboarding-progress-dots").innerHTML = ONBOARDING_STEPS.map((_, index) =>
+      `<span class="${index === onboardingStep ? "is-active" : ""}"></span>`
+    ).join("");
+    const last = onboardingStep === ONBOARDING_STEPS.length - 1;
+    modal.querySelector('[data-onboarding-action="back"]').hidden = onboardingStep === 0;
+    modal.querySelector('[data-onboarding-action="next"]').hidden = last;
+    modal.querySelector('[data-onboarding-action="explore"]').hidden = !last;
+    modal.querySelector('[data-onboarding-action="create"]').hidden = !last;
+  }
+
+  function openOnboardingModal(userId, options = {}) {
+    const modal = getOnboardingModal();
+    if (!modal || !userId || !modal.hidden) return;
     onboardingActiveUserId = userId;
+    onboardingIsReplay = Boolean(options.replay);
+    onboardingStep = onboardingIsReplay ? 0 : readOnboardingStep(userId);
+    onboardingReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    renderOnboardingStep();
     modal.hidden = false;
+    document.body.classList.remove("has-onboarding-pending");
     document.body.classList.add("has-onboarding-open");
+    modal.querySelector("#onboarding-title").focus();
   }
 
   function closeOnboardingModal(options = {}) {
     const modal = getOnboardingModal();
-    if (!modal) return;
-    const shouldMarkSeen = options.markSeen !== false;
+    if (!modal || modal.hidden) return;
+    if (options.complete) markOnboardingSeen(onboardingActiveUserId);
     modal.hidden = true;
     document.body.classList.remove("has-onboarding-open");
-    if (shouldMarkSeen && onboardingActiveUserId) {
-      markOnboardingSeen(onboardingActiveUserId);
-    }
     onboardingActiveUserId = "";
+    onboardingIsReplay = false;
+    if (onboardingReturnFocus && onboardingReturnFocus.isConnected && onboardingReturnFocus !== document.body) onboardingReturnFocus.focus();
+    onboardingReturnFocus = null;
   }
 
   async function maybeShowOnboarding(userId) {
-    if (!shouldUseOnboardingModal() || !userId) return;
+    if (page !== "home" || !userId) return;
     if (onboardingShownForUserId === userId) return;
 
     onboardingShownForUserId = userId;
     const seen = await hasSeenOnboarding(userId);
-    if (seen) return;
+    if (onboardingCurrentUserId !== userId) return;
+    document.body.classList.remove("has-onboarding-pending");
+    if (seen === null) {
+      onboardingShownForUserId = "";
+      return;
+    }
+    if (seen) {
+      window.ClashlyPush?.maybeShowInstalledPrompt?.().catch(() => {});
+      return;
+    }
     openOnboardingModal(userId);
   }
 
@@ -861,16 +934,50 @@
     document.addEventListener("click", (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      const closeTrigger = target.closest("[data-close-onboarding='true']");
-      if (!closeTrigger) return;
+      const actionButton = target.closest("[data-onboarding-action]");
+      if (!actionButton || !modal.contains(actionButton) || modal.hidden) return;
       event.preventDefault();
-      closeOnboardingModal();
+      const action = actionButton.getAttribute("data-onboarding-action");
+      if (action === "close") closeOnboardingModal();
+      if (action === "skip" || action === "explore") closeOnboardingModal({ complete: true });
+      if (action === "create") {
+        closeOnboardingModal({ complete: true });
+        openCreateModal();
+      }
+      if (action === "back" || action === "next") {
+        onboardingStep += action === "next" ? 1 : -1;
+        onboardingStep = Math.max(0, Math.min(ONBOARDING_STEPS.length - 1, onboardingStep));
+        if (!onboardingIsReplay) saveOnboardingStep(onboardingActiveUserId, onboardingStep);
+        renderOnboardingStep();
+        modal.querySelector("#onboarding-title").focus();
+      }
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !modal.hidden) {
+      if (modal.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
         closeOnboardingModal();
+        return;
       }
+      if (event.key === "Tab") {
+        const controls = Array.from(modal.querySelectorAll(".onboarding-modal__panel button:not([hidden])"));
+        const first = controls[0];
+        const last = controls[controls.length - 1];
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === modal.querySelector("#onboarding-title"))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    const replayButton = document.getElementById("settings-view-tutorial");
+    if (replayButton) replayButton.addEventListener("click", async () => {
+      const userId = onboardingCurrentUserId || (await window.ClashlySession.resolveSession()).user?.id;
+      if (userId) openOnboardingModal(userId, { replay: true });
     });
   }
 
@@ -888,12 +995,18 @@
       stopNotificationWatcher();
       notificationsUserId = "";
       onboardingShownForUserId = "";
-      closeOnboardingModal({ markSeen: false });
+      onboardingCurrentUserId = "";
+      document.body.classList.remove("has-onboarding-pending");
+      closeOnboardingModal();
       updateNavNotificationBadges(false);
       return;
     }
 
-    maybeShowOnboarding(user.id).catch(() => {});
+    onboardingCurrentUserId = user.id;
+    maybeShowOnboarding(user.id).catch(() => {
+      document.body.classList.remove("has-onboarding-pending");
+      onboardingShownForUserId = "";
+    });
     notificationsUserId = user.id;
     checkNavNotifications(user.id).catch(() => {});
     startNotificationWatcher(user.id);
@@ -1721,6 +1834,7 @@
   }
 
   function boot() {
+    if (page === "home") document.body.classList.add("has-onboarding-pending");
     initPwa();
     buildTopNav();
     buildBottomNav();
