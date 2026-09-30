@@ -27,13 +27,6 @@
       const script = document.createElement("script");
       script.type = "speculationrules";
       const rules = {
-        prerender: [
-          {
-            source: "list",
-            urls: PREFETCH_PAGES,
-            eagerness: "moderate", // Prerenders on hover or pointerdown
-          },
-        ],
         prefetch: [
           {
             source: "list",

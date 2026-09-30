@@ -4,8 +4,10 @@
   const DARK = "dark";
   const MANIFEST_HREF = "manifest.json";
   const APPLE_TOUCH_ICON_HREF = "assets/pwa-192.png";
-  const FAVICON_LIGHT_HREF = "assets/Lightmode_logo.svg";
-  const FAVICON_DARK_HREF = "assets/Darkmode_logo.svg";
+  const FAVICON_LIGHT_HREF = "assets/Lightmode_favicon.svg";
+  const FAVICON_DARK_HREF = "assets/Darkmode_favicon.svg";
+  const LOGO_LIGHT_HREF = "assets/Lightmode_logo.svg";
+  const LOGO_DARK_HREF = "assets/Darkmode_logo.svg";
   const THEME_COLOR_LIGHT = "#f5f5f7";
   const THEME_COLOR_DARK = "#0d0e10";
 
@@ -26,7 +28,7 @@
     const nextTheme = theme === DARK ? DARK : LIGHT;
     document.documentElement.dataset.theme = nextTheme;
     document.querySelectorAll("[data-theme-logo]").forEach((logo) => {
-      logo.src = nextTheme === DARK ? FAVICON_DARK_HREF : FAVICON_LIGHT_HREF;
+      logo.src = nextTheme === DARK ? LOGO_DARK_HREF : LOGO_LIGHT_HREF;
     });
 
     try {

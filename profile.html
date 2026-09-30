@@ -17,7 +17,7 @@
     <script src="js/loader.js"></script>
     <script src="js/cache-service.js"></script>
     <script src="js/prefetch.js"></script>
-    <link rel="icon" type="image/svg+xml" href="assets/Lightmode_logo.svg" />
+    <link rel="icon" type="image/svg+xml" href="assets/Lightmode_favicon.svg" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" href="assets/pwa-192.png" />
     <meta name="theme-color" content="#0a0a0b" />
@@ -116,17 +116,24 @@
       <div class="edit-profile-modal__backdrop" data-close-edit-profile="true"></div>
       <section class="edit-profile-modal__panel" role="dialog" aria-modal="true" aria-labelledby="edit-profile-title">
         <header class="edit-profile-modal__head">
-          <div>
-            <p class="edit-profile-modal__eyebrow">Profile</p>
+          <div class="edit-profile-modal__heading">
+            <p class="edit-profile-modal__eyebrow">Make it yours</p>
             <h2 id="edit-profile-title">Edit profile</h2>
+            <p class="edit-profile-modal__intro">A little context helps people know who is behind your takes.</p>
           </div>
-          <button type="button" class="btn btn--ghost" data-close-edit-profile="true" aria-label="Close edit profile modal">X</button>
+          <button type="button" class="edit-profile-modal__close" data-close-edit-profile="true" aria-label="Close edit profile modal">
+            <i class="app-icon fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
         </header>
 
         <form id="edit-profile-form" class="edit-profile-form" novalidate>
           <div class="edit-profile-avatar">
             <div class="profile-avatar edit-profile-avatar__preview" id="edit-profile-avatar-preview" aria-hidden="true">CL</div>
-            <label class="btn btn--ghost edit-profile-avatar__upload" for="edit-profile-avatar-input">Change photo</label>
+            <div class="edit-profile-avatar__copy">
+              <strong>Profile photo</strong>
+              <span>Pick a photo people will recognize in the feed.</span>
+              <button type="button" class="edit-profile-avatar__upload" id="edit-profile-avatar-upload">Change photo <i class="app-icon fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i></button>
+            </div>
             <input
               id="edit-profile-avatar-input"
               name="avatar"
@@ -136,14 +143,26 @@
             />
           </div>
 
-          <label class="field-label" for="edit-profile-username">Username</label>
-          <input id="edit-profile-username" name="username" type="text" maxlength="20" required />
+          <div class="edit-profile-field">
+            <label class="field-label" for="edit-profile-username">Username</label>
+            <input id="edit-profile-username" name="username" type="text" maxlength="20" autocomplete="username" aria-describedby="edit-profile-username-help" required />
+            <p class="edit-profile-field__help" id="edit-profile-username-help">3–20 lowercase letters, numbers, or underscores.</p>
+          </div>
 
-          <label class="field-label" for="edit-profile-bio">Bio</label>
-          <textarea id="edit-profile-bio" name="bio" rows="4" maxlength="280" placeholder="Write a short bio"></textarea>
+          <div class="edit-profile-field">
+            <div class="edit-profile-field__heading">
+              <label class="field-label" for="edit-profile-bio">Bio</label>
+              <span id="edit-profile-bio-count" class="edit-profile-field__count" aria-live="polite">0 / 280</span>
+            </div>
+            <textarea id="edit-profile-bio" name="bio" rows="4" maxlength="280" placeholder="What do you love debating? What should people know about you?" aria-describedby="edit-profile-bio-help"></textarea>
+            <p class="edit-profile-field__help" id="edit-profile-bio-help">Shown on your profile. A good intro makes it easier to connect.</p>
+          </div>
 
-          <label class="field-label" for="edit-profile-dob">Date of birth</label>
-          <input id="edit-profile-dob" name="date_of_birth" type="date" />
+          <div class="edit-profile-field">
+            <label class="field-label" for="edit-profile-dob">Date of birth <span class="edit-profile-field__optional">Optional</span></label>
+            <input id="edit-profile-dob" name="date_of_birth" type="date" aria-describedby="edit-profile-dob-help" />
+            <p class="edit-profile-field__help" id="edit-profile-dob-help">Stored with your account and not shown on your public profile.</p>
+          </div>
 
           <p id="edit-profile-status" class="status-message" hidden></p>
 

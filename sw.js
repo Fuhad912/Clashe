@@ -1,4 +1,4 @@
-const VERSION = "clashe-pwa-v22";
+const VERSION = "clashe-pwa-v24";
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE = `${VERSION}-pages`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -52,6 +52,8 @@ const APP_SHELL_ASSETS = [
   "./manifest.webmanifest",
   "./assets/Lightmode_logo.svg",
   "./assets/Darkmode_logo.svg",
+  "./assets/Lightmode_favicon.svg",
+  "./assets/Darkmode_favicon.svg",
   "./assets/pwa-192.png",
   "./assets/pwa-512.png"
 ];
@@ -103,7 +105,7 @@ self.addEventListener("activate", (event) => {
 async function networkFirst(request, cacheName, fallbackUrl) {
   const cache = await caches.open(cacheName);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: "no-cache" });
     if (isCacheableResponse(response)) {
       cache.put(request, response.clone());
     }
@@ -111,6 +113,8 @@ async function networkFirst(request, cacheName, fallbackUrl) {
   } catch (_error) {
     const cached = await cache.match(request);
     if (cached) return cached;
+    const precached = await caches.match(request);
+    if (precached) return precached;
     if (fallbackUrl) {
       const fallback = await caches.match(fallbackUrl);
       if (fallback) return fallback;
@@ -154,27 +158,6 @@ function isSupabaseStorageImageRequest(request, url) {
   return url.hostname.endsWith(".supabase.co") && url.pathname.includes("/storage/v1/object/public/");
 }
 
-async function staleWhileRevalidatePage(request, cacheName, fallbackUrl) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const fetchPromise = fetch(request)
-    .then((response) => {
-      if (isCacheableResponse(response)) {
-        cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(async () => {
-      if (cached) return cached;
-      if (fallbackUrl) {
-        return caches.match(fallbackUrl);
-      }
-      return null;
-    });
-
-  return cached || fetchPromise;
-}
-
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
@@ -185,12 +168,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate" && isSameOrigin) {
-    event.respondWith(staleWhileRevalidatePage(request, PAGE_CACHE, "./index.html"));
+    const isHome = url.pathname.endsWith("/") || url.pathname.endsWith("/index.html");
+    event.respondWith(networkFirst(request, PAGE_CACHE, isHome ? "./index.html" : null));
     return;
   }
 
   if (isSameOrigin && /\.(?:css|js|woff2?|ttf|png|jpg|jpeg|svg|webp|webmanifest)$/i.test(url.pathname)) {
-    event.respondWith(staleWhileRevalidate(request, STATIC_CACHE));
+    const isCode = /\.(?:css|js)$/i.test(url.pathname);
+    event.respondWith(isCode ? networkFirst(request, STATIC_CACHE) : staleWhileRevalidate(request, STATIC_CACHE));
     return;
   }
 

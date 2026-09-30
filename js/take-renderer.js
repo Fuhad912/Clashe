@@ -622,15 +622,44 @@
         : voteData.userVote === "disagree"
           ? `<span class="profile-grid-vote profile-grid-vote--disagree">You disagreed</span>`
           : "";
-    const mediaMarkup = hasImage
+    const isMultiImage = imageUrls.length > 1;
+    const hasExcerpt = Boolean(excerpt && excerpt.trim());
+    const overlayMarkup = hasExcerpt
       ? `
+          <div class="profile-grid-take__overlay">
+            <p class="profile-grid-take__excerpt">${excerpt}</p>
+          </div>
+        `
+      : "";
+    const mediaMarkup = hasImage
+      ? isMultiImage
+        ? `
+        <div class="profile-grid-take__media-wrap profile-grid-take__media-wrap--split">
+          ${imageUrls
+            .slice(0, 2)
+            .map(
+              (imageUrl, index) => `
+                <div class="profile-grid-take__media-slot">
+                  <img
+                    class="profile-grid-take__media"
+                    src="${window.ClashlyUtils.escapeHtml(imageUrl)}"
+                    alt="Take image ${index + 1} from ${window.ClashlyUtils.escapeHtml(username)}"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+              `
+            )
+            .join("")}
+          ${overlayMarkup}
+        </div>
+      `
+        : `
         <div class="profile-grid-take__media-wrap">
           <img class="profile-grid-take__media" src="${window.ClashlyUtils.escapeHtml(
             imageUrls[0]
           )}" alt="Take image from ${window.ClashlyUtils.escapeHtml(username)}" loading="lazy" decoding="async" />
-          <div class="profile-grid-take__overlay">
-            <p class="profile-grid-take__excerpt">${excerpt}</p>
-          </div>
+          ${overlayMarkup}
         </div>
       `
       : `
@@ -688,7 +717,7 @@
     return `
       <article class="profile-grid-take${hasImage ? " profile-grid-take--with-image" : " profile-grid-take--text-only"}" data-take-id="${window.ClashlyUtils.escapeHtml(
         take.id
-      )}">
+      )}" data-action="comments">
         ${pinnedBadge}
         ${gridShareButton}
         ${pinButton}
@@ -1073,6 +1102,7 @@
       rootEl.addEventListener("click", (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
+        if (target.closest("button, [data-action='pin-take'], [data-action='delete-take'], [data-action='share'], [data-action='take-more']")) return;
         const link = target.closest("[data-action='comments']");
         if (!link || !rootEl.contains(link)) return;
 
