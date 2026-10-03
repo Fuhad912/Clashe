@@ -236,13 +236,16 @@
       throw new Error("Username must be 3-20 characters using lowercase letters, numbers, or underscore.");
     }
 
-    const availability = await window.ClashlyProfiles.isUsernameAvailable(normalized, userId);
-    if (availability.error) {
-      throw availability.error;
-    }
-
-    if (!availability.available) {
-      throw new Error("Username already exists. Choose another one.");
+    try {
+      const availability = await window.ClashlyProfiles.isUsernameAvailable(normalized, userId);
+      if (availability && !availability.error && availability.available === false) {
+        throw new Error("Username already exists. Choose another one.");
+      }
+    } catch (err) {
+      if (err.message && err.message.includes("already exists")) {
+        throw err;
+      }
+      console.warn("[Clashly] Username pre-check skipped due to network notice:", err);
     }
 
     return normalized;
@@ -281,20 +284,21 @@
     );
   }
 
-  function resolveSubmitErrorMessage(error) {
+  function resolveSubmitErrorMessage(error, currentStep) {
     if (isUsernameConflictError(error)) {
       return "Username already exists. Choose another one.";
     }
+
+    const raw = error && typeof error.message === "string" ? error.message.trim() : "";
+    const lower = raw.toLowerCase();
 
     if (isNetworkError(error)) {
       if (window.location.protocol === "file:") {
         return "Cannot connect from local file:// URL. Please open Clashe using a local server (e.g. VS Code Live Server or 'npx serve').";
       }
-      return "Could not reach the server. Please check your internet connection or browser shields, then try again.";
+      const stepMsg = currentStep === "saving_profile" ? "while saving profile" : currentStep === "uploading_avatar" ? "while uploading photo" : currentStep === "validating_username" ? "while checking username" : "";
+      return `Could not reach the server${stepMsg ? " " + stepMsg : ""}${raw ? ` (${raw})` : ""}. Check connection or browser shields, then try again.`;
     }
-
-    const raw = error && typeof error.message === "string" ? error.message.trim() : "";
-    const lower = raw.toLowerCase();
 
     if (lower.includes("timeout") || lower.includes("timed out")) {
       return "Request timed out. Please check your connection and try again.";
@@ -613,7 +617,9 @@
         submitBtn.disabled = true;
         submitBtn.textContent = "Saving...";
 
+        let currentStep = "checking_account";
         try {
+          currentStep = "checking_account";
           setStatus("Checking account...", "");
           let user = null;
           try {
@@ -625,6 +631,7 @@
             throw new Error("Your session expired. Log in again.");
           }
 
+          currentStep = "validating_username";
           setStatus("Validating username...", "");
           const normalizedUsername = await withTimeout(
             validateUsername(rawUsername, user.id),
@@ -640,18 +647,25 @@
           }
 
           if (avatarFile) {
+            currentStep = "uploading_avatar";
             setStatus("Uploading profile photo...", "");
-            const uploadResult = await withTimeout(
-              window.ClashlyProfiles.uploadAvatar(avatarFile, user.id),
-              "Timed out while uploading profile photo.",
-              20000
-            );
-            if (uploadResult.error) {
-              throw uploadResult.error;
+            try {
+              const uploadResult = await withTimeout(
+                window.ClashlyProfiles.uploadAvatar(avatarFile, user.id),
+                "Timed out while uploading profile photo.",
+                15000
+              );
+              if (uploadResult && uploadResult.error) {
+                console.warn("[Clashly] Avatar upload non-fatal warning (proceeding without uploaded photo):", uploadResult.error);
+              } else if (uploadResult && uploadResult.avatarUrl) {
+                avatarUrl = uploadResult.avatarUrl;
+              }
+            } catch (avatarError) {
+              console.warn("[Clashly] Avatar upload non-fatal exception (proceeding without uploaded photo):", avatarError);
             }
-            avatarUrl = uploadResult.avatarUrl;
           }
 
+          currentStep = "saving_profile";
           setStatus("Saving profile...", "");
           const saveResult = await withTimeout(
             window.ClashlyProfiles.upsertProfile({
@@ -665,13 +679,14 @@
             "Timed out while saving profile."
           );
 
-          if (saveResult.error) {
+          if (saveResult && saveResult.error) {
             if (saveResult.error.code === "23505") {
               throw new Error("Username already exists. Choose another one.");
             }
             throw saveResult.error;
           }
 
+          currentStep = "finalizing";
           if (window.ClashlyEmail && typeof window.ClashlyEmail.sendWelcomeEmail === "function") {
             window.ClashlyEmail.sendWelcomeEmail({
               email: user.email,
@@ -686,8 +701,8 @@
           } catch (_error) {}
           redirectToHome();
         } catch (error) {
-          window.ClashlyUtils.reportError("Profile setup submit failed.", error, "Unable to complete setup.");
-          const message = resolveSubmitErrorMessage(error);
+          window.ClashlyUtils.reportError(`Profile setup submit failed (${currentStep}).`, error, "Unable to complete setup.");
+          const message = resolveSubmitErrorMessage(error, currentStep);
           if (message.toLowerCase().includes("date_of_birth")) {
             setStatus("Database schema is outdated. Run supabase/phase2_setup.sql and try again.", "error");
             return;

@@ -252,25 +252,63 @@
       avatar_url: input.avatarUrl || null,
     };
 
-    const { data, error } = await client
-      .from(PROFILES_TABLE)
-      .upsert(payload, { onConflict: "id" })
-      .select()
-      .maybeSingle();
+    let lastError = null;
 
-    if (error) {
-      const fallback = await client
-        .from(PROFILES_TABLE)
-        .upsert(payload, { onConflict: "id" });
-      if (fallback.error) {
-        return { profile: null, error: fallback.error };
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        let { data, error } = await client
+          .from(PROFILES_TABLE)
+          .upsert(payload, { onConflict: "id" })
+          .select()
+          .maybeSingle();
+
+        if (error && error.code !== "23505") {
+          // If upsert fails with non-duplicate error, try plain insert
+          const insertAttempt = await client
+            .from(PROFILES_TABLE)
+            .insert(payload)
+            .select()
+            .maybeSingle();
+          if (!insertAttempt.error) {
+            data = insertAttempt.data;
+            error = null;
+          } else if (
+            insertAttempt.error.code === "23505" &&
+            String(insertAttempt.error.message || "").includes("profiles_pkey")
+          ) {
+            const updateAttempt = await client
+              .from(PROFILES_TABLE)
+              .update(payload)
+              .eq("id", input.userId)
+              .select()
+              .maybeSingle();
+            if (!updateAttempt.error) {
+              data = updateAttempt.data;
+              error = null;
+            } else {
+              error = updateAttempt.error;
+            }
+          } else {
+            error = insertAttempt.error;
+          }
+        }
+
+        if (!error) {
+          const saved = data ? cacheProfile(data) : cacheProfile(payload);
+          return { profile: saved, error: null };
+        }
+
+        lastError = error;
+      } catch (err) {
+        lastError = err;
       }
-      const cached = cacheProfile(payload);
-      return { profile: cached, error: null };
+
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
     }
 
-    const saved = data ? cacheProfile(data) : cacheProfile(payload);
-    return { profile: saved, error: null };
+    return { profile: null, error: lastError };
   }
 
 
