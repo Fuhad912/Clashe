@@ -263,16 +263,48 @@
     );
   }
 
+  function isNetworkError(error) {
+    if (!error) return false;
+    const msg = String(
+      typeof error === "string"
+        ? error
+        : error.message || error.msg || error.error_description || error.description || error.name || ""
+    ).toLowerCase();
+    return (
+      msg.includes("failed to fetch") ||
+      msg.includes("network request failed") ||
+      msg.includes("networkerror") ||
+      msg.includes("load failed") ||
+      msg.includes("connection refused") ||
+      msg.includes("authretryablefetcherror") ||
+      msg.includes("offline")
+    );
+  }
+
   function resolveSubmitErrorMessage(error) {
     if (isUsernameConflictError(error)) {
       return "Username already exists. Choose another one.";
     }
 
-    if (error && typeof error.message === "string" && error.message.trim()) {
-      return error.message.trim();
+    if (isNetworkError(error)) {
+      if (window.location.protocol === "file:") {
+        return "Cannot connect from local file:// URL. Please open Clashe using a local server (e.g. VS Code Live Server or 'npx serve').";
+      }
+      return "Could not reach the server. Please check your internet connection or browser shields, then try again.";
     }
 
-    return "Unable to complete setup.";
+    const raw = error && typeof error.message === "string" ? error.message.trim() : "";
+    const lower = raw.toLowerCase();
+
+    if (lower.includes("timeout") || lower.includes("timed out")) {
+      return "Request timed out. Please check your connection and try again.";
+    }
+
+    if (raw && raw !== "Unable to complete setup.") {
+      return raw;
+    }
+
+    return "Unable to complete setup. Please try again.";
   }
 
   // ── Live username sanitize + availability check ──────────────
@@ -583,7 +615,12 @@
 
         try {
           setStatus("Checking account...", "");
-          const user = await withTimeout(userPromise, "Timed out while checking your account.");
+          let user = null;
+          try {
+            user = await withTimeout(userPromise, "Timed out while checking your account.");
+          } catch (_err) {
+            user = await withTimeout(resolveCurrentUser(), "Timed out while checking your account.");
+          }
           if (!user) {
             throw new Error("Your session expired. Log in again.");
           }
@@ -676,10 +713,7 @@
             "Timed out while loading current profile."
           );
           if (existingProfile.error) {
-            setStatus(
-              window.ClashlyUtils.reportError("Profile preload failed.", existingProfile.error, "Unable to load current profile."),
-              "error"
-            );
+            console.warn("[Clashly] Profile preload notice (new account or fetch failed):", existingProfile.error);
             return;
           }
 
@@ -701,8 +735,7 @@
           }
           setAvatarHandle(avatarHandleEl, existingProfileData.username || "");
         } catch (error) {
-          const message = window.ClashlyUtils.reportError("Profile preload failed.", error, "Unable to load current profile.");
-          setStatus(message, "error");
+          console.warn("[Clashly] Profile preload notice:", error);
         }
       })();
     } catch (error) {

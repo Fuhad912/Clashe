@@ -382,6 +382,24 @@
     return "Authentication failed.";
   }
 
+  function isNetworkError(error) {
+    if (!error) return false;
+    const msg = String(
+      typeof error === "string"
+        ? error
+        : error.message || error.msg || error.error_description || error.description || error.name || ""
+    ).toLowerCase();
+    return (
+      msg.includes("failed to fetch") ||
+      msg.includes("network request failed") ||
+      msg.includes("networkerror") ||
+      msg.includes("load failed") ||
+      msg.includes("connection refused") ||
+      msg.includes("authretryablefetcherror") ||
+      msg.includes("offline")
+    );
+  }
+
   function isEmailDeliveryFailure(message) {
     const normalized = String(message || "").toLowerCase();
     return normalized.includes("error sending confirmation email") || normalized.includes("error sending email");
@@ -407,8 +425,11 @@
       return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
     }
 
-    if (message.includes("failed to fetch") || message.includes("network request failed")) {
-      return "Could not reach Supabase. Check js/env.js URL/key and your internet connection.";
+    if (isNetworkError(error) || message.includes("failed to fetch") || message.includes("network request failed")) {
+      if (window.location.protocol === "file:") {
+        return "Cannot connect from local file:// URL. Please open Clashe using a local server (e.g. VS Code Live Server or 'npx serve').";
+      }
+      return "Could not reach Supabase. Check your internet connection or disable browser shields/ad-blockers (e.g. Brave Shields).";
     }
 
     if (message.includes("email rate limit exceeded") || message.includes("rate limit")) {
@@ -584,12 +605,18 @@
       window.ClashlyProfiles.clearProfileCache();
     }
 
-    const profileCheck = await window.ClashlyProfiles.hasCompletedProfile(userId);
-    if (profileCheck.error) {
-      throw profileCheck.error;
+    let isCompleted = false;
+    try {
+      const profileCheck = await window.ClashlyProfiles.hasCompletedProfile(userId);
+      if (!profileCheck.error && profileCheck.completed) {
+        isCompleted = true;
+      }
+    } catch (_error) {
+      // Default to profile-setup if profile check encounters any error
+      isCompleted = false;
     }
 
-    window.location.replace(profileCheck.completed ? "index.html" : "profile-setup.html");
+    window.location.replace(isCompleted ? "index.html" : "profile-setup.html");
   }
 
   async function handleLogin(email, password) {

@@ -134,7 +134,15 @@
       return `Password must be at least ${MIN_PASSWORD_LEN} characters.`;
     }
 
-    if (message.includes("failed to fetch") || message.includes("network request failed")) {
+    if (
+      message.includes("failed to fetch") ||
+      message.includes("network request failed") ||
+      message.includes("networkerror") ||
+      message.includes("load failed")
+    ) {
+      if (window.location.protocol === "file:") {
+        return "Cannot connect from local file:// URL. Please open Clashe using a local server (e.g. VS Code Live Server or 'npx serve').";
+      }
       return "Could not reach Supabase. Check your connection and try again.";
     }
 

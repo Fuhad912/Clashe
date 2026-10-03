@@ -252,15 +252,25 @@
       avatar_url: input.avatarUrl || null,
     };
 
-    const { error } = await client
+    const { data, error } = await client
       .from(PROFILES_TABLE)
-      .upsert(payload, { onConflict: "id" });
+      .upsert(payload, { onConflict: "id" })
+      .select()
+      .maybeSingle();
 
     if (error) {
-      return { profile: null, error };
+      const fallback = await client
+        .from(PROFILES_TABLE)
+        .upsert(payload, { onConflict: "id" });
+      if (fallback.error) {
+        return { profile: null, error: fallback.error };
+      }
+      const cached = cacheProfile(payload);
+      return { profile: cached, error: null };
     }
 
-    return getProfileById(input.userId);
+    const saved = data ? cacheProfile(data) : cacheProfile(payload);
+    return { profile: saved, error: null };
   }
 
 
